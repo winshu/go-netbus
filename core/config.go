@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/go-ini/ini"
 	"log"
+	"strconv"
 	"strings"
 )
 
@@ -19,6 +20,19 @@ type ClientConfig struct {
 func (t ClientConfig) GetLocalAddr() []string {
 	str := strings.ReplaceAll(t.LocalAddr, " ", "")
 	return strings.Split(str, ",")
+}
+
+// 解析地址
+func ParseHost(host string) (ip string, port int) {
+	arr := strings.Split(host, ":")
+	if len(arr) != 2 {
+		return "", 0
+	}
+	port, err := strconv.Atoi(strings.TrimSpace(arr[1]))
+	if err != nil {
+		port = 0
+	}
+	return strings.TrimSpace(arr[0]), port
 }
 
 var (

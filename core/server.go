@@ -27,18 +27,35 @@ func accept(listener net.Listener) net.Conn {
 	return conn
 }
 
-func Server(config ServerConfig) {
-	listener := listen(config.Port)
-	accessListener := listen(8001)
-
+func handleServerConn(port int, conn net.Conn) {
+	proxy := listen(port + 1000)
 	for {
-		conn := accept(listener)
-		accessConn := accept(accessListener)
-		if conn == nil || accessConn == nil {
+		proxyConn := accept(proxy)
+		if conn == nil || proxyConn == nil {
 			log.Println("Accept client failed, retry at", 5, "seconds")
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		forward(conn, accessConn)
+		forward(conn, proxyConn)
+	}
+}
+
+func Server(config ServerConfig) {
+	listener := listen(config.Port)
+
+	for {
+		conn := accept(listener)
+
+		buffer := make([]byte, 1024)
+		n, err := conn.Read(buffer)
+		if err != nil {
+			log.Println("Fail to read local addresses", err.Error())
+			continue
+		}
+		address := string(buffer[:n])
+		_, port := ParseHost(address)
+		log.Println("proxy address", address)
+
+		go handleServerConn(port, conn)
 	}
 }

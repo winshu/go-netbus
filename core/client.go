@@ -11,7 +11,7 @@ func dial(targetAddr string, maxRedialTimes int) net.Conn {
 	for {
 		conn, err := net.Dial("tcp", targetAddr)
 		if err == nil {
-			log.Println("Connection success ->", targetAddr)
+			log.Println("Dial success ->", targetAddr)
 			return conn
 		}
 		switch {
@@ -21,19 +21,35 @@ func dial(targetAddr string, maxRedialTimes int) net.Conn {
 		case redialTimes < maxRedialTimes:
 			redialTimes++
 			// 有限重连模式，每5秒一次
-			log.Printf("Connection failed, start the %dth reconnection. error: %s", redialTimes, err.Error())
+			log.Printf("Dial failed, start the %dth reconnection. error: %s", redialTimes, err.Error())
 			time.Sleep(redialIntervalTime * time.Second)
 		default:
-			log.Println("Connection failed ->", err.Error())
+			log.Println("Dial failed ->", err.Error())
 			return nil
 		}
 	}
 }
 
-func Client(config ClientConfig) {
-	serverConn := dial(config.ServerAddr, 0)
-	//for {
-	conn := dial(config.LocalAddr, 0)
+func handleClientConn(localAddr, serverAddr string) {
+	conn := dial(localAddr, 0)
+	if conn == nil {
+		return
+	}
+	serverConn := dial(serverAddr, 0)
+	if serverConn == nil {
+		return
+	}
+	_, err := serverConn.Write([]byte(localAddr))
+	if err != nil {
+		log.Println("Fail to send address", err.Error())
+		return
+	}
 	forward(conn, serverConn)
-	//}
+}
+
+func Client(config ClientConfig) {
+	for _, addr := range config.GetLocalAddr() {
+		go handleClientConn(addr, config.ServerAddr)
+	}
+	select {}
 }

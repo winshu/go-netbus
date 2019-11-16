@@ -11,12 +11,11 @@ import (
 const redialIntervalTime = 5
 
 func connCopy(source, target net.Conn, wg *sync.WaitGroup) {
-	_, err := io.Copy(source, target)
+	buffer := make([]byte, 2048)
+	_, err := io.CopyBuffer(source, target, buffer)
 	if err != nil {
 		log.Println("Connection interrupted", err.Error())
 	}
-	_ = source.Close()
-	log.Printf("Connection closed [remote/local]=[%s/%s]\n", source.RemoteAddr(), source.LocalAddr())
 	wg.Done()
 }
 
