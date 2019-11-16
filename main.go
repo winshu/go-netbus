@@ -8,12 +8,12 @@ import (
 	"time"
 )
 
-func printWelcome() {
+func printWelcome(args []string) {
 	fmt.Println("+----------------------------------------------------------------+")
 	fmt.Println("| Welcome to use NetBus version 1.0.0 .                          |")
 	fmt.Println("| Code by winshu at 2019-10-19                                   |")
 	fmt.Println("| If you have some problem when you use the tool,                |")
-	fmt.Println("| Please submit issue at : https://gitee.com/winshu/NetBus .     |")
+	fmt.Println("| Please submit issue at : https://gitee.com/winshu/go-netbus .  |")
 	fmt.Println("+----------------------------------------------------------------+")
 	fmt.Println()
 	// sleep one second because the fmt is not thread-safety.
@@ -33,11 +33,11 @@ func printHelp() {
 }
 
 func main() {
-	log.SetFlags(log.Ldate | log.Lmicroseconds)
-	printWelcome()
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
 	args := os.Args
 	argc := len(os.Args)
+	printWelcome(args)
 
 	if argc < 2 {
 		printHelp()
@@ -46,11 +46,12 @@ func main() {
 
 	switch args[1] {
 	case "-server":
-		core.Server(6666)
+		serverConfig := core.InitServerConfig()
+		core.Server(serverConfig)
 	case "-client":
-		core.Client("127.0.0.1:7456", "127.0.0.1:6666")
+		clientConfig := core.InitClientConfig()
+		core.Client(clientConfig)
 	default:
 		printHelp()
 	}
 }
-

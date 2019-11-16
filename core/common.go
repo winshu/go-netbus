@@ -1,13 +1,29 @@
 package core
 
 import (
+	"io"
 	"log"
 	"net"
 	"sync"
 )
 
+// 重连间隔时间
+const redialIntervalTime = 5
+
+func connCopy(source, target net.Conn, wg *sync.WaitGroup) {
+	_, err := io.Copy(source, target)
+	if err != nil {
+		log.Println("Connection interrupted", err.Error())
+	}
+	_ = source.Close()
+	log.Printf("Connection closed [remote/local]=[%s/%s]\n", source.RemoteAddr(), source.LocalAddr())
+	wg.Done()
+}
+
 func forward(conn1 net.Conn, conn2 net.Conn) {
-	log.Printf("[+] start transmit. [%s],[%s] <-> [%s],[%s] \n", conn1.LocalAddr(), conn1.RemoteAddr(), conn2.LocalAddr(), conn2.RemoteAddr())
+	log.Printf("Forward channel [%s/%s] <-> [%s/%s]\n",
+		conn1.RemoteAddr(), conn1.LocalAddr(), conn2.RemoteAddr(), conn2.LocalAddr())
+
 	var wg sync.WaitGroup
 	// wait tow goroutines
 	wg.Add(2)
@@ -15,15 +31,4 @@ func forward(conn1 net.Conn, conn2 net.Conn) {
 	go connCopy(conn2, conn1, &wg)
 	//blocking when the wg is locked
 	wg.Wait()
-}
-
-// 受理请求
-func accept(listener net.Listener) net.Conn {
-	conn, err := listener.Accept()
-	if err != nil {
-		log.Printf("[x] accept connect [%s] failed. %s", conn.RemoteAddr(), err.Error())
-		return nil
-	}
-	log.Printf("[√] accept a new client. remote address:[%s], local address:[%s]", conn.RemoteAddr(), conn.LocalAddr())
-	return conn
 }
