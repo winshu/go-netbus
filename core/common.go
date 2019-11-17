@@ -15,11 +15,11 @@ func connCopy(source, target net.Conn, wg *sync.WaitGroup) {
 	if err != nil {
 		log.Println("Connection interrupted", err.Error())
 	}
+	source.Close()
 	wg.Done()
 }
 
 func forward(conn1, conn2 net.Conn) {
-	log.Println(&conn1)
 	log.Printf("Forward channel [%s/%s] <-> [%s/%s]\n",
 		conn1.RemoteAddr(), conn1.LocalAddr(), conn2.RemoteAddr(), conn2.LocalAddr())
 
