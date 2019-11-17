@@ -11,15 +11,15 @@ import (
 const redialIntervalTime = 5
 
 func connCopy(source, target net.Conn, wg *sync.WaitGroup) {
-	buffer := make([]byte, 2048)
-	_, err := io.CopyBuffer(source, target, buffer)
+	_, err := io.Copy(source, target)
 	if err != nil {
 		log.Println("Connection interrupted", err.Error())
 	}
 	wg.Done()
 }
 
-func forward(conn1 net.Conn, conn2 net.Conn) {
+func forward(conn1, conn2 net.Conn) {
+	log.Println(&conn1)
 	log.Printf("Forward channel [%s/%s] <-> [%s/%s]\n",
 		conn1.RemoteAddr(), conn1.LocalAddr(), conn2.RemoteAddr(), conn2.LocalAddr())
 

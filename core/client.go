@@ -9,6 +9,7 @@ import (
 func dial(targetAddr string, maxRedialTimes int) net.Conn {
 	redialTimes := 0
 	for {
+		log.Println("Dial to", targetAddr)
 		conn, err := net.Dial("tcp", targetAddr)
 		if err == nil {
 			log.Println("Dial success ->", targetAddr)
@@ -31,20 +32,22 @@ func dial(targetAddr string, maxRedialTimes int) net.Conn {
 }
 
 func handleClientConn(localAddr, serverAddr string) {
-	conn := dial(localAddr, 0)
-	if conn == nil {
-		return
+	for {
+		conn := dial(localAddr, 0)
+		if conn == nil {
+			return
+		}
+		serverConn := dial(serverAddr, 0)
+		if serverConn == nil {
+			return
+		}
+		_, err := serverConn.Write([]byte(localAddr))
+		if err != nil {
+			log.Println("Fail to send address", err.Error())
+			return
+		}
+		forward(conn, serverConn)
 	}
-	serverConn := dial(serverAddr, 0)
-	if serverConn == nil {
-		return
-	}
-	_, err := serverConn.Write([]byte(localAddr))
-	if err != nil {
-		log.Println("Fail to send address", err.Error())
-		return
-	}
-	forward(conn, serverConn)
 }
 
 func Client(config ClientConfig) {

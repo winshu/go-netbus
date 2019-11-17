@@ -11,7 +11,7 @@ func TestClient(t *testing.T) {
 
 	config := core.ClientConfig{
 		ServerAddr: "127.0.0.1:6666",
-		LocalAddr:  "127.0.0.1:7001",
+		LocalAddr:  "127.0.0.1:7456",
 	}
 	core.Client(config)
 }
