@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"github.com/go-ini/ini"
 	"log"
 	"strconv"
@@ -22,17 +23,30 @@ func (t ClientConfig) GetLocalAddr() []string {
 	return strings.Split(str, ",")
 }
 
+type NetAddress struct {
+	IP      string
+	Port    int
+	invalid bool
+}
+
+func (t NetAddress) String() string {
+	if t.invalid {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d", t.IP, t.Port)
+}
+
 // 解析地址
-func ParseHost(host string) (ip string, port int) {
+func ParseNetAddress(host string) NetAddress {
 	arr := strings.Split(host, ":")
 	if len(arr) != 2 {
-		return "", 0
+		return NetAddress{}
 	}
 	port, err := strconv.Atoi(strings.TrimSpace(arr[1]))
 	if err != nil {
 		port = 0
 	}
-	return strings.TrimSpace(arr[0]), port
+	return NetAddress{strings.TrimSpace(arr[0]), port, false}
 }
 
 var (

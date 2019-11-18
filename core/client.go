@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// 重连间隔时间
+const redialIntervalTime = 5
+
 func dial(targetAddr string, maxRedialTimes int) net.Conn {
 	redialTimes := 0
 	for {

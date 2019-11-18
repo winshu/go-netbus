@@ -29,43 +29,36 @@ func accept(listener net.Listener) net.Conn {
 	return conn
 }
 
-func handleServerConn(conn net.Conn) {
-	// 建立连接后，接收发来的被代理者信息
-	buffer := make([]byte, 1024)
-	n, err := conn.Read(buffer)
-	if err != nil {
-		log.Println("Fail to read local addresses", err.Error())
-		return
+func Server(config ServerConfig) {
+	serverListener := listen(config.Port)
+	if serverListener == nil {
+		os.Exit(1)
 	}
-	address := string(buffer[:n])
-	_, port := ParseHost(address)
-	log.Println("proxy address", address)
-
-	proxy := listen(port + 1000)
-	if proxy == nil {
-		return
-	}
+	listeners := make(map[string]net.Listener, 10)
 	for {
-		proxyConn := accept(proxy)
+		conn := accept(serverListener)
+		if conn == nil {
+			continue
+		}
+		address := readHeader(conn)
+		if address.invalid {
+			log.Println("Read original address failed")
+			continue
+		}
+
+		listener, ok := listeners[address.String()]
+		if !ok {
+			listener = listen(address.Port + 1000)
+			listeners[address.String()] = listener
+		}
+
+		proxyConn := accept(listener)
 		if conn == nil || proxyConn == nil {
 			log.Println("Accept client failed, retry at", 5, "seconds")
 			time.Sleep(5 * time.Second)
 			continue
 		}
 		forward(conn, proxyConn)
-	}
-}
-
-func Server(config ServerConfig) {
-	listener := listen(config.Port)
-	if listener == nil {
-		os.Exit(1)
-	}
-	for {
-		conn := accept(listener)
-		if conn != nil {
-			go handleServerConn(conn)
-		}
 	}
 }
 
