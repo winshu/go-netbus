@@ -6,9 +6,6 @@ import (
 	"time"
 )
 
-// 重连间隔时间
-const redialIntervalTime = 5
-
 func dial(targetAddr string, maxRedialTimes int) net.Conn {
 	redialTimes := 0
 	for {
@@ -21,12 +18,12 @@ func dial(targetAddr string, maxRedialTimes int) net.Conn {
 		switch {
 		case maxRedialTimes < 0:
 			// 无限重连模式，每1分钟一次
-			time.Sleep(1 * time.Minute)
+			time.Sleep(time.Minute)
 		case redialTimes < maxRedialTimes:
 			redialTimes++
 			// 有限重连模式，每5秒一次
 			log.Printf("Dial failed, start the %dth reconnection. error: %s", redialTimes, err.Error())
-			time.Sleep(redialIntervalTime * time.Second)
+			time.Sleep(retryIntervalTime * time.Second)
 		default:
 			log.Println("Dial failed ->", err.Error())
 			return nil
@@ -44,11 +41,13 @@ func handleClientConn(localAddr, serverAddr string) {
 		if serverConn == nil {
 			return
 		}
+
 		_, err := serverConn.Write([]byte(localAddr))
 		if err != nil {
-			log.Println("Fail to send address", err.Error())
+			log.Println("Send header error", err.Error())
 			return
 		}
+
 		forward(conn, serverConn)
 	}
 }

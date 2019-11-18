@@ -40,12 +40,10 @@ func Server(config ServerConfig) {
 		if conn == nil {
 			continue
 		}
-		address := readHeader(conn)
-		if address.invalid {
-			log.Println("Read original address failed")
-			continue
-		}
 
+		buffer := make([]byte, 1024)
+		n, _ := conn.Read(buffer)
+		address := ParseNetAddress(string(buffer[:n]))
 		listener, ok := listeners[address.String()]
 		if !ok {
 			listener = listen(address.Port + 1000)
@@ -54,8 +52,8 @@ func Server(config ServerConfig) {
 
 		proxyConn := accept(listener)
 		if conn == nil || proxyConn == nil {
-			log.Println("Accept client failed, retry at", 5, "seconds")
-			time.Sleep(5 * time.Second)
+			log.Println("Accept client failed, retry at", retryIntervalTime, "seconds")
+			time.Sleep(retryIntervalTime * time.Second)
 			continue
 		}
 		forward(conn, proxyConn)
@@ -79,8 +77,8 @@ func SingleServer(config ServerConfig) {
 
 		conn2 := accept(listener2)
 		if conn1 == nil || conn2 == nil {
-			log.Println("Accept client failed, retry at", 5, "seconds")
-			time.Sleep(5 * time.Second)
+			log.Println("Accept client failed, retry at", retryIntervalTime, "seconds")
+			time.Sleep(retryIntervalTime * time.Second)
 			continue
 		}
 		forward(conn1, conn2)

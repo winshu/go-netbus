@@ -2,10 +2,8 @@ package test
 
 import (
 	"../core"
-	"fmt"
 	"log"
 	"testing"
-	"time"
 )
 
 // -----------------------------------------------------------------------------
@@ -47,13 +45,4 @@ func TestHost2Host(t *testing.T) {
 func TestPort2Host(t *testing.T) {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	core.Port2Host("6666", "127.0.0.1:7456")
-}
-
-func TestStruct2Byte(t *testing.T) {
-	header := &core.Header{
-		Address:   core.NetAddress{IP: "127.0.0.1", Port: 6666},
-		Timestamp: time.Now().Unix(),
-	}
-	bytes := core.Serialize(header)
-	fmt.Println("ptestStruct.data is : ", *core.Deserialize(&bytes))
 }
