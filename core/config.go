@@ -14,8 +14,9 @@ type ServerConfig struct {
 }
 
 type ClientConfig struct {
-	ServerAddr string
-	LocalAddr  string
+	ServerAddr     string
+	LocalAddr      string
+	MaxRedialTimes int
 }
 
 func (t ClientConfig) GetLocalAddr() []string {
@@ -24,15 +25,11 @@ func (t ClientConfig) GetLocalAddr() []string {
 }
 
 type NetAddress struct {
-	IP      string
-	Port    int
-	invalid bool
+	IP   string
+	Port int
 }
 
 func (t NetAddress) String() string {
-	if t.invalid {
-		return ""
-	}
 	return fmt.Sprintf("%s:%d", t.IP, t.Port)
 }
 
@@ -46,7 +43,7 @@ func ParseNetAddress(host string) NetAddress {
 	if err != nil {
 		port = 0
 	}
-	return NetAddress{strings.TrimSpace(arr[0]), port, false}
+	return NetAddress{strings.TrimSpace(arr[0]), port}
 }
 
 var (
@@ -82,7 +79,11 @@ func InitClientConfig() ClientConfig {
 	}
 	serverAddr := client("server-host").String()
 	localAddr := client("local-host").String()
-	clientConfig = ClientConfig{ServerAddr: serverAddr, LocalAddr: localAddr}
+	maxRedialTimes, err := client("max-redial-times").Int()
+	if err != nil {
+		maxRedialTimes = 20
+	}
+	clientConfig = ClientConfig{ServerAddr: serverAddr, LocalAddr: localAddr, MaxRedialTimes: maxRedialTimes}
 	log.Println("Init client config finished", clientConfig)
 	return clientConfig
 }

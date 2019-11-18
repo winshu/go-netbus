@@ -1,6 +1,7 @@
 package test
 
 import (
+	"../core"
 	"fmt"
 	"log"
 	"net/http"
@@ -27,4 +28,12 @@ func TestWeb7001(t *testing.T) {
 
 func TestWeb7002(t *testing.T) {
 	listenOnPort(7002)
+}
+
+func TestToByte(t *testing.T) {
+	arr := []string{"127.0.0.1:3306", "255.255.255.255:65535", "我是中国人:333"}
+	for _, v := range arr {
+		n := core.FormatHeader(v)
+		fmt.Println([]byte(n), len([]byte(n)))
+	}
 }

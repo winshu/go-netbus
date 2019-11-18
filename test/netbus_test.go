@@ -22,8 +22,9 @@ func TestClient(t *testing.T) {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
 	config := core.ClientConfig{
-		ServerAddr: "127.0.0.1:6666",
-		LocalAddr:  "127.0.0.1:7456",
+		ServerAddr:     "127.0.0.1:6666",
+		LocalAddr:      "127.0.0.1:3306",
+		MaxRedialTimes: 10,
 	}
 	core.Client(config)
 }
@@ -33,13 +34,13 @@ func TestClient(t *testing.T) {
 // server
 func TestPort2Port(t *testing.T) {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
-	core.Port2Port("6666", "8456")
+	core.Port2Port("6666", "4306")
 }
 
 // client
 func TestHost2Host(t *testing.T) {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
-	core.Host2Host("127.0.0.1:7456", "127.0.0.1:6666")
+	core.Host2Host("127.0.0.1:3306", "127.0.0.1:6666")
 }
 
 func TestPort2Host(t *testing.T) {

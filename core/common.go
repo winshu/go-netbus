@@ -4,16 +4,20 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 )
 
 // 重连间隔时间
 const retryIntervalTime = 5
 
+// 固定报文头长度
+const headerLengthInByte = 32
+
 func connCopy(source, target net.Conn, wg *sync.WaitGroup) {
 	_, err := io.Copy(source, target)
 	if err != nil {
-		log.Println("Connection interrupted", err.Error())
+		log.Println("Connection interrupted")
 	}
 	_ = source.Close()
 	wg.Done()
@@ -30,4 +34,12 @@ func forward(conn1, conn2 net.Conn) {
 	go connCopy(conn2, conn1, &wg)
 	//blocking when the wg is locked
 	wg.Wait()
+}
+
+// 固定报文头长度
+func FormatHeader(header string) string {
+	if len(header) > headerLengthInByte {
+		return header[:headerLengthInByte]
+	}
+	return header + strings.Repeat(" ", headerLengthInByte-len(header))
 }

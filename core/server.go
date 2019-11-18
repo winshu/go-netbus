@@ -41,11 +41,19 @@ func Server(config ServerConfig) {
 			continue
 		}
 
-		buffer := make([]byte, 1024)
-		n, _ := conn.Read(buffer)
-		address := ParseNetAddress(string(buffer[:n]))
-		listener, ok := listeners[address.String()]
-		if !ok {
+		buffer := make([]byte, headerLengthInByte)
+		_, err := conn.Read(buffer)
+		if err != nil {
+			log.Println("Received header failed", err.Error())
+			_ = conn.Close()
+			continue
+		}
+
+		address := ParseNetAddress(string(buffer))
+		log.Println("Received header", address)
+
+		listener, exists := listeners[address.String()]
+		if !exists {
 			listener = listen(address.Port + 1000)
 			listeners[address.String()] = listener
 		}
