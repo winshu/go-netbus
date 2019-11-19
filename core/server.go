@@ -45,13 +45,13 @@ func Server(cfg config.ServerConfig) {
 		buffer := make([]byte, headerLengthInByte)
 		_, err := conn.Read(buffer)
 		if err != nil {
-			log.Println("Received header failed", err.Error())
+			log.Println("Receive header failed", err.Error())
 			_ = conn.Close()
 			continue
 		}
 
 		address := config.ParseNetAddress(string(buffer))
-		log.Println("Received header", address)
+		log.Println("Receive header", address)
 
 		listener, exists := listeners[address.String()]
 		if !exists {

@@ -14,7 +14,7 @@ type ServerConfig struct {
 
 var serverConfig ServerConfig
 
-// ------------------------------------------------------------------------------
+// 从参数中解析配置
 func parseServerConfig(args []string) {
 	if len(args) == 0 {
 		log.Fatalln("More args in need")
@@ -28,6 +28,7 @@ func parseServerConfig(args []string) {
 	log.Println("Init server config from args finished", serverConfig)
 }
 
+// 从配置文件中加载配置
 func loadServerConfig() {
 	cfg, err := ini.Load("config.ini")
 	if err != nil {
@@ -44,6 +45,7 @@ func loadServerConfig() {
 	log.Println("Init server config from config.ini finished", serverConfig)
 }
 
+// 初始化服务端配置，支持从参数中读取或者从配置文件中读取
 func InitServerConfig(args []string) ServerConfig {
 	if len(args) == 0 {
 		loadServerConfig()
@@ -52,5 +54,3 @@ func InitServerConfig(args []string) ServerConfig {
 	}
 	return serverConfig
 }
-
-// ------------------------------------------------------------------------------

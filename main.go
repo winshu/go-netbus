@@ -19,7 +19,7 @@ func printWelcome(args []string) {
 	fmt.Println()
 	// sleep one second because the fmt is not thread-safety.
 	// if not to do this, fmt.Print will print after the log.Print.
-	time.Sleep(time.Second)
+	time.Sleep(500 * time.Millisecond)
 }
 
 func printHelp() {
@@ -31,7 +31,6 @@ func printHelp() {
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
-
 	args := os.Args
 	argc := len(os.Args)
 	printWelcome(args)
