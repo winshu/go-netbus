@@ -15,7 +15,7 @@ func listen(port int) net.Listener {
 	host := fmt.Sprintf("0.0.0.0:%d", port)
 	listener, err := net.Listen("tcp", host)
 	if err != nil {
-		log.Println("Listen failed, the port may be used or closed", host)
+		log.Println("Listen failed, the port may be used or closed", port)
 		return nil
 	}
 	log.Println("Listening at address", host)
@@ -72,12 +72,13 @@ func handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 var listeners sync.Map
 
 // 根据地址获取已建立的监听，如果不存在则创建监听
-func loadOrStore(address config.NetAddress, portMode int) net.Listener {
-	listener, _ := listeners.LoadOrStore(address.String(), func() net.Listener {
-		// 不存在，创建监听，并放入监听池
-		proxyPort := config.NewProxyPort(portMode, address.Port)
-		return listen(proxyPort)
-	}())
+func loadOrStore(originalAddr config.NetAddress, portMode int) net.Listener {
+	listener, exists := listeners.Load(originalAddr.String())
+	if !exists {
+		proxyPort := config.NewProxyPort(portMode, originalAddr.Port)
+		listener = listen(proxyPort)
+		listeners.Store(originalAddr.String(), listener)
+	}
 	return listener.(net.Listener)
 }
 
