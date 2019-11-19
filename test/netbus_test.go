@@ -16,8 +16,8 @@ func init() {
 // netbus
 func TestServer(t *testing.T) {
 	cfg := config.ServerConfig{
-		Port:       6666,
-		RandomPort: true,
+		Port:     6666,
+		PortMode: 2,
 	}
 	core.Server(cfg)
 }
