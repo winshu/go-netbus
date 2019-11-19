@@ -15,11 +15,11 @@
 - 纯命令行启动（不需要配置文件）
 - 配置文件启动（需要配置文件）**【推荐】**
 
-#### 命令行启动
-
-**启动服务端**
+### 命令行启动
 
 ```bash
+# 启动服务端
+
 $ netbus -server <port> [port-mode]
 
 # 注释
@@ -31,9 +31,9 @@ $ netbus -server <port> [port-mode]
 
 ```
 
-**启动客户端**
-
 ```bash
+# 启动客户端
+
 $ netbus -client <server:port> <local:port>
 
 # 注释
@@ -41,7 +41,7 @@ $ netbus -client <server:port> <local:port>
 # local:port   被代理服务地址，多个以逗号隔开，格式如：127.0.0.1:8080,127.0.0.1:9200
 ```
 
-#### 配置文件启动
+### 配置文件启动
 
 配置文件`config.ini`需与启动文件置于同一目录。
 
