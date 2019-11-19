@@ -25,7 +25,7 @@ func TestServer(t *testing.T) {
 func TestClient(t *testing.T) {
 	cfg := config.ClientConfig{
 		ServerAddr:     "127.0.0.1:6666",
-		LocalAddr:      "127.0.0.1:7456",
+		LocalAddr:      "127.0.0.1:7001,127.0.0.1:7002",
 		MaxRedialTimes: 10,
 	}
 	core.Client(cfg)

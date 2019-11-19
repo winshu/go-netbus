@@ -6,9 +6,11 @@ import (
 	"log"
 	"net"
 	"os"
+	"sync"
 	"time"
 )
 
+// 监听端口
 func listen(port int) net.Listener {
 	host := fmt.Sprintf("0.0.0.0:%d", port)
 	listener, err := net.Listen("tcp", host)
@@ -20,6 +22,7 @@ func listen(port int) net.Listener {
 	return listener
 }
 
+// 受理请求
 func accept(listener net.Listener) net.Conn {
 	conn, err := listener.Accept()
 	if err != nil {
@@ -44,40 +47,50 @@ func receiveHeader(conn net.Conn) (config.NetAddress, bool) {
 	return address, true
 }
 
+// 处理连接
+func handleServerConn(conn net.Conn, cfg config.ServerConfig) {
+	// 接收消息头，并检查端口是否可代理
+	address, ok := receiveHeader(conn)
+	if !ok || !config.CheckProxyPort(cfg.PortMode, address.Port) {
+		return
+	}
+	// 取出监听
+	listener := loadOrStore(address, cfg.PortMode)
+	// 代理连接
+	proxyConn := accept(listener)
+	if conn == nil || proxyConn == nil {
+		log.Println("Accept client failed, retry after", retryIntervalTime, "seconds")
+		time.Sleep(retryIntervalTime * time.Second)
+		return
+	}
+	forward(conn, proxyConn)
+}
+
+// 所有访问监听器
+// key:   NetAddress.String()
+// value: net.Listener
+var listeners sync.Map
+
+// 根据地址获取已建立的监听，如果不存在则创建监听
+func loadOrStore(address config.NetAddress, portMode int) net.Listener {
+	listener, _ := listeners.LoadOrStore(address.String(), func() net.Listener {
+		// 不存在，创建监听，并放入监听池
+		proxyPort := config.NewProxyPort(portMode, address.Port)
+		return listen(proxyPort)
+	}())
+	return listener.(net.Listener)
+}
+
 func Server(cfg config.ServerConfig) {
 	serverListener := listen(cfg.Port)
 	if serverListener == nil {
 		os.Exit(1)
 	}
 	// TODO 需要记录已使用的端口
-	listeners := make(map[string]net.Listener, 10)
 	for {
 		conn := accept(serverListener)
-		if conn == nil {
-			continue
+		if conn != nil {
+			go handleServerConn(conn, cfg)
 		}
-
-		// 接收消息头，并检查端口是否可代理
-		address, ok := receiveHeader(conn)
-		if !ok || !config.CheckProxyPort(cfg.PortMode, address.Port) {
-			continue
-		}
-
-		// 取出监听
-		listener, exists := listeners[address.String()]
-		if !exists {
-			proxyPort := config.NewProxyPort(cfg.PortMode, address.Port)
-			listener = listen(proxyPort)
-			listeners[address.String()] = listener
-		}
-
-		// 代理连接
-		proxyConn := accept(listener)
-		if conn == nil || proxyConn == nil {
-			log.Println("Accept client failed, retry after", retryIntervalTime, "seconds")
-			time.Sleep(retryIntervalTime * time.Second)
-			continue
-		}
-		forward(conn, proxyConn)
 	}
 }
