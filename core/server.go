@@ -30,11 +30,26 @@ func accept(listener net.Listener) net.Conn {
 	return conn
 }
 
+// 接收消息头，包含了地址信息
+func receiveHeader(conn net.Conn) (config.NetAddress, bool) {
+	buffer := make([]byte, headerLengthInByte)
+	_, err := conn.Read(buffer)
+	if err != nil {
+		log.Println("Receive header failed", err.Error())
+		_ = conn.Close()
+		return config.NetAddress{}, false
+	}
+	address, _ := config.ParseNetAddress(string(buffer))
+	log.Println("Receive header", address)
+	return address, true
+}
+
 func Server(cfg config.ServerConfig) {
 	serverListener := listen(cfg.Port)
 	if serverListener == nil {
 		os.Exit(1)
 	}
+	// TODO 需要记录已使用的端口
 	listeners := make(map[string]net.Listener, 10)
 	for {
 		conn := accept(serverListener)
@@ -42,23 +57,21 @@ func Server(cfg config.ServerConfig) {
 			continue
 		}
 
-		buffer := make([]byte, headerLengthInByte)
-		_, err := conn.Read(buffer)
-		if err != nil {
-			log.Println("Receive header failed", err.Error())
-			_ = conn.Close()
+		// 接收消息头，并检查端口是否可代理
+		address, ok := receiveHeader(conn)
+		if !ok || !config.CheckProxyPort(cfg.PortMode, address.Port) {
 			continue
 		}
 
-		address := config.ParseNetAddress(string(buffer))
-		log.Println("Receive header", address)
-
+		// 取出监听
 		listener, exists := listeners[address.String()]
 		if !exists {
-			listener = listen(address.Port + 1000)
+			proxyPort := config.NewProxyPort(cfg.PortMode, address.Port)
+			listener = listen(proxyPort)
 			listeners[address.String()] = listener
 		}
 
+		// 代理连接
 		proxyConn := accept(listener)
 		if conn == nil || proxyConn == nil {
 			log.Println("Accept client failed, retry after", retryIntervalTime, "seconds")

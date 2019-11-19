@@ -22,10 +22,15 @@ var clientConfig ClientConfig
 // 从参数中解析配置
 func parseClientConfig(args []string) {
 	if len(args) < 2 {
-		log.Fatalln("More args in need")
+		log.Fatalln("More args in need.", args)
 	}
 	serverAddr := strings.TrimSpace(args[0])
 	localAddr := strings.TrimSpace(args[1])
+
+	// 检查配置
+	if !checkNetAddress(serverAddr) || !checkNetAddress(localAddr) {
+		log.Fatalln("Fail to parse address, the format is 'ip:port', such as '127.0.0.1:1024'")
+	}
 
 	clientConfig = ClientConfig{
 		ServerAddr:     serverAddr,

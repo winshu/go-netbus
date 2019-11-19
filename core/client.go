@@ -29,16 +29,19 @@ func dial(targetAddr string, maxRedialTimes int) net.Conn {
 	}
 }
 
-func handleClientConn(localAddr, serverAddr string, maxRedialTimes int) {
+func handleConn(localAddr, serverAddr string, maxRedialTimes int) {
 	for {
+		// 本地服务拨号
 		conn := dial(localAddr, maxRedialTimes)
 		if conn == nil {
 			return
 		}
+		// 代理服务拨号
 		serverConn := dial(serverAddr, maxRedialTimes)
 		if serverConn == nil {
 			return
 		}
+		// 写消息头
 		header := FormatHeader(localAddr)
 		_, err := serverConn.Write([]byte(header))
 		if err != nil {
@@ -51,7 +54,7 @@ func handleClientConn(localAddr, serverAddr string, maxRedialTimes int) {
 
 func Client(cfg config.ClientConfig) {
 	for _, addr := range cfg.GetLocalAddr() {
-		go handleClientConn(addr, cfg.ServerAddr, cfg.MaxRedialTimes)
+		go handleConn(addr, cfg.ServerAddr, cfg.MaxRedialTimes)
 	}
 	select {}
 }
