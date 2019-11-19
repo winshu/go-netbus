@@ -1,6 +1,7 @@
 package core
 
 import (
+	"../config"
 	"log"
 	"net"
 	"time"
@@ -48,9 +49,9 @@ func handleClientConn(localAddr, serverAddr string, maxRedialTimes int) {
 	}
 }
 
-func Client(config ClientConfig) {
-	for _, addr := range config.GetLocalAddr() {
-		go handleClientConn(addr, config.ServerAddr, config.MaxRedialTimes)
+func Client(cfg config.ClientConfig) {
+	for _, addr := range cfg.GetLocalAddr() {
+		go handleClientConn(addr, cfg.ServerAddr, cfg.MaxRedialTimes)
 	}
 	select {}
 }

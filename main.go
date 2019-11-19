@@ -1,6 +1,7 @@
 package main
 
 import (
+	"./config"
 	"./core"
 	"fmt"
 	"log"
@@ -22,8 +23,10 @@ func printWelcome(args []string) {
 }
 
 func printHelp() {
-	fmt.Println(`usage: "-server" start as server`)
-	fmt.Println(`       "-client" start as client`)
+	fmt.Println(`method A: "-server" load "config.ini" and start as server`)
+	fmt.Println(`          "-client " load "config.ini" and start as client`)
+	fmt.Println(`method B: "-server <port>" start as server, and listening at port x', e.g. -server 6666`)
+	fmt.Println(`          "-client <server:port> <local:port>" start as client, e.g. -client 123.54.23.67:6666 127.0.0.1:3306`)
 }
 
 func main() {
@@ -38,12 +41,15 @@ func main() {
 		os.Exit(0)
 	}
 
+	// 获取其余参数
+	argsConfig := args[2:]
+
 	switch args[1] {
 	case "-server":
-		serverConfig := core.InitServerConfig()
+		serverConfig := config.InitServerConfig(argsConfig)
 		core.Server(serverConfig)
 	case "-client":
-		clientConfig := core.InitClientConfig()
+		clientConfig := config.InitClientConfig(argsConfig)
 		core.Client(clientConfig)
 	default:
 		printHelp()

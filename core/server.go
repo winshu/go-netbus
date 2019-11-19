@@ -1,6 +1,7 @@
 package core
 
 import (
+	"../config"
 	"fmt"
 	"log"
 	"net"
@@ -29,8 +30,8 @@ func accept(listener net.Listener) net.Conn {
 	return conn
 }
 
-func Server(config ServerConfig) {
-	serverListener := listen(config.Port)
+func Server(cfg config.ServerConfig) {
+	serverListener := listen(cfg.Port)
 	if serverListener == nil {
 		os.Exit(1)
 	}
@@ -49,7 +50,7 @@ func Server(config ServerConfig) {
 			continue
 		}
 
-		address := ParseNetAddress(string(buffer))
+		address := config.ParseNetAddress(string(buffer))
 		log.Println("Received header", address)
 
 		listener, exists := listeners[address.String()]

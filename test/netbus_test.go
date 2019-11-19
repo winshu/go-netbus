@@ -1,6 +1,7 @@
 package test
 
 import (
+	"../config"
 	"../core"
 	"log"
 	"testing"
@@ -14,18 +15,18 @@ func init() {
 
 // netbus
 func TestServer(t *testing.T) {
-	config := core.ServerConfig{
+	cfg := config.ServerConfig{
 		Port:       6666,
 		RandomPort: true,
 	}
-	core.Server(config)
+	core.Server(cfg)
 }
 
 func TestClient(t *testing.T) {
-	config := core.ClientConfig{
+	cfg := config.ClientConfig{
 		ServerAddr:     "127.0.0.1:6666",
 		LocalAddr:      "127.0.0.1:7456",
 		MaxRedialTimes: 10,
 	}
-	core.Client(config)
+	core.Client(cfg)
 }
