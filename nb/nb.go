@@ -1,4 +1,4 @@
-package core
+package nb
 
 import (
 	"io"
@@ -8,26 +8,28 @@ import (
 	"time"
 )
 
+// 网上的一个案例
+
 const timeout = 5
 
 func Port2Port(port1 string, port2 string) {
-	listen1 := startServer("0.0.0.0:" + port1)
-	listen2 := startServer("0.0.0.0:" + port2)
+	listen1 := listen("0.0.0.0:" + port1)
+	listen2 := listen("0.0.0.0:" + port2)
 	log.Println("[√]", "listen port:", port1, "and", port2, "success. waiting for client...")
 	for {
-		conn1 := accept2(listen1)
-		conn2 := accept2(listen2)
+		conn1 := accept(listen1)
+		conn2 := accept(listen2)
 		if conn1 == nil || conn2 == nil {
 			log.Println("[x]", "accept client failed. retry in ", timeout, " seconds. ")
 			time.Sleep(timeout * time.Second)
 			continue
 		}
-		forward2(conn1, conn2)
+		forward(conn1, conn2)
 	}
 }
 
 func Port2Host(allowPort string, targetAddress string) {
-	server := startServer("0.0.0.0:" + allowPort)
+	server := listen("0.0.0.0:" + allowPort)
 	for {
 		conn := accept(server)
 		if conn == nil {
@@ -45,7 +47,7 @@ func Port2Host(allowPort string, targetAddress string) {
 				return
 			}
 			log.Println("[→]", "connect target address ["+targetAddress+"] success.")
-			forward2(target, conn)
+			forward(target, conn)
 		}(targetAddress)
 	}
 }
@@ -75,11 +77,11 @@ func Host2Host(address1, address2 string) {
 				time.Sleep(timeout * time.Second)
 			}
 		}
-		forward2(host1, host2)
+		forward(host1, host2)
 	}
 }
 
-func startServer(address string) net.Listener {
+func listen(address string) net.Listener {
 	log.Println("[+]", "try to start server on:["+address+"]")
 	server, err := net.Listen("tcp", address)
 	if err != nil {
@@ -89,7 +91,7 @@ func startServer(address string) net.Listener {
 	return server
 }
 
-func accept2(listener net.Listener) net.Conn {
+func accept(listener net.Listener) net.Conn {
 	conn, err := listener.Accept()
 	if err != nil {
 		log.Println("[x]", "accept connect ["+conn.RemoteAddr().String()+"] failed.", err.Error())
@@ -99,18 +101,18 @@ func accept2(listener net.Listener) net.Conn {
 	return conn
 }
 
-func forward2(conn1 net.Conn, conn2 net.Conn) {
+func forward(conn1 net.Conn, conn2 net.Conn) {
 	log.Printf("[+] start transmit. [%s],[%s] <-> [%s],[%s] \n", conn1.LocalAddr().String(), conn1.RemoteAddr().String(), conn2.LocalAddr().String(), conn2.RemoteAddr().String())
 	var wg sync.WaitGroup
 	// wait tow goroutines
 	wg.Add(2)
-	go connCopy2(conn1, conn2, &wg)
-	go connCopy2(conn2, conn1, &wg)
+	go connCopy(conn1, conn2, &wg)
+	go connCopy(conn2, conn1, &wg)
 	//blocking when the wg is locked
 	wg.Wait()
 }
 
-func connCopy2(conn1 net.Conn, conn2 net.Conn, wg *sync.WaitGroup) {
+func connCopy(conn1 net.Conn, conn2 net.Conn, wg *sync.WaitGroup) {
 	// 读数据，读完了不要关闭连接
 	_, err := io.Copy(conn1, conn2)
 	if err != nil {

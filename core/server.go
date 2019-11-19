@@ -60,35 +60,10 @@ func Server(config ServerConfig) {
 
 		proxyConn := accept(listener)
 		if conn == nil || proxyConn == nil {
-			log.Println("Accept client failed, retry at", retryIntervalTime, "seconds")
+			log.Println("Accept client failed, retry after", retryIntervalTime, "seconds")
 			time.Sleep(retryIntervalTime * time.Second)
 			continue
 		}
 		forward(conn, proxyConn)
-	}
-}
-
-func SingleServer(config ServerConfig) {
-	listener1 := listen(config.Port)
-	listener2 := listen(8456)
-
-	for {
-		conn1 := accept(listener1)
-		buffer := make([]byte, 1024)
-		n, err := conn1.Read(buffer)
-		if err != nil {
-			log.Println("Fail to read local addresses", err.Error())
-			return
-		}
-		address := string(buffer[:n])
-		log.Println("proxy address", address)
-
-		conn2 := accept(listener2)
-		if conn1 == nil || conn2 == nil {
-			log.Println("Accept client failed, retry at", retryIntervalTime, "seconds")
-			time.Sleep(retryIntervalTime * time.Second)
-			continue
-		}
-		forward(conn1, conn2)
 	}
 }

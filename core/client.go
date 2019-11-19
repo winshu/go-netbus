@@ -19,7 +19,7 @@ func dial(targetAddr string, maxRedialTimes int) net.Conn {
 		redialTimes++
 		if maxRedialTimes < 0 || redialTimes < maxRedialTimes {
 			// 重连模式，每5秒一次
-			log.Printf("Dial failed, start the %dth reconnection after %dnd", redialTimes, retryIntervalTime)
+			log.Printf("Dial failed, retry(%d) after %dnd", redialTimes, retryIntervalTime)
 			time.Sleep(retryIntervalTime * time.Second)
 		} else {
 			log.Println("Dial failed ->", err.Error())

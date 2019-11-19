@@ -8,11 +8,12 @@ import (
 	"sync"
 )
 
-// 重连间隔时间
-const retryIntervalTime = 5
-
-// 固定报文头长度
-const headerLengthInByte = 32
+const (
+	// 重连间隔时间
+	retryIntervalTime = 5
+	// 固定报文头长度
+	headerLengthInByte = 32
+)
 
 func connCopy(source, target net.Conn, wg *sync.WaitGroup) {
 	_, err := io.Copy(source, target)
