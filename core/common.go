@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -20,7 +19,7 @@ const (
 func connCopy(source, target net.Conn, wg *sync.WaitGroup) {
 	_, err := io.Copy(source, target)
 	if err != nil {
-		log.Println("Connection interrupted")
+		//log.Println("Connection interrupted")
 	}
 	_ = source.Close()
 	wg.Done()
@@ -73,10 +72,8 @@ func receiveHeader(conn net.Conn) (config.NetAddress, bool) {
 	return address, true
 }
 
-// 从监听中提取出端口
-func pickPort(listener net.Listener) int {
-	address := listener.Addr().String()
-	index := strings.LastIndex(address, ":")
-	port, _ := strconv.Atoi(address[index:])
-	return port
+func closeConn(conn net.Conn) {
+	if conn != nil {
+		_ = conn.Close()
+	}
 }

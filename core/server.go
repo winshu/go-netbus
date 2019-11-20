@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 // 监听端口
@@ -67,6 +66,7 @@ func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 	// 接收消息头，并检查端口是否可代理
 	address, ok := receiveHeader(conn)
 	if !ok || !config.CheckProxyPort(cfg.PortMode, address.Port) {
+		closeConn(conn)
 		return
 	}
 	// 取出监听
@@ -75,17 +75,18 @@ func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 	header := _buildAccessAddress(conn, listener)
 	log.Println("Access address", header)
 	if !sendHeader(conn, header) {
+		closeConn(conn)
 		return
 	}
 
 	// 代理连接
 	proxyConn := _accept(listener)
-	if conn == nil || proxyConn == nil {
-		log.Println("Accept client failed, retry after", retryIntervalTime, "seconds")
-		time.Sleep(retryIntervalTime * time.Second)
-		return
+	if conn != nil && proxyConn != nil {
+		forward(conn, proxyConn)
+	} else {
+		closeConn(conn)
+		closeConn(proxyConn)
 	}
-	forward(conn, proxyConn)
 }
 
 func Server(cfg config.ServerConfig) {

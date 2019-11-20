@@ -21,7 +21,7 @@ func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*�
 		redialTimes++
 		if maxRedialTimes < 0 || redialTimes < maxRedialTimes {
 			// 重连模式，每5秒一次
-			log.Printf("Dial failed, retry(%d) after %dnd", redialTimes, retryIntervalTime)
+			log.Printf("Dial failed, retry(%d) after %d seconeds.", redialTimes, retryIntervalTime)
 			time.Sleep(retryIntervalTime * time.Second)
 		} else {
 			log.Println("Dial failed ->", err.Error())
@@ -56,9 +56,12 @@ func _handleClientConn(localAddr, serverAddr config.NetAddress, maxRedialTimes i
 			return
 		}
 		// 请求头
-		if header, ok := _requestHeader(serverConn, localAddr); ok {
-			log.Println("Access address", header)
+		if _, ok := _requestHeader(serverConn, localAddr); ok {
 			forward(conn, serverConn)
+		} else {
+			// 关闭连接
+			closeConn(conn)
+			closeConn(serverConn)
 		}
 	}
 }
