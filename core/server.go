@@ -70,6 +70,7 @@ func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 		return
 	}
 	// 取出监听
+	// TODO FIX 存在监听无法被 close 的问题
 	listener := _loadOrStore(address, cfg.PortMode)
 	// 回写访问地址
 	header := _buildAccessAddress(conn, listener)
