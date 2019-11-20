@@ -7,28 +7,22 @@ import (
 )
 
 type ClientConfig struct {
-	ServerAddr     string
-	LocalAddr      string
+	ServerAddr     NetAddress
+	LocalAddr      []NetAddress
 	MaxRedialTimes int
-}
-
-func (t ClientConfig) GetLocalAddr() []string {
-	str := strings.ReplaceAll(t.LocalAddr, " ", "")
-	return strings.Split(str, ",")
 }
 
 var clientConfig ClientConfig
 
 // 从参数中解析配置
-func parseClientConfig(args []string) {
+func _parseClientConfig(args []string) {
 	if len(args) < 2 {
 		log.Fatalln("More args in need.", args)
 	}
-	serverAddr := strings.TrimSpace(args[0])
-	localAddr := strings.TrimSpace(args[1])
-
-	// 检查配置
-	if !checkNetAddress(serverAddr) || !checkNetAddress(localAddr) {
+	// 解析地址
+	serverAddr, ok1 := ParseNetAddress(strings.TrimSpace(args[0]))
+	localAddr, ok2 := ParseNetAddresses(strings.TrimSpace(args[1]))
+	if !ok1 || !ok2 {
 		log.Fatalln("Fail to parse address, the format is 'ip:port', such as '127.0.0.1:1024'")
 	}
 
@@ -41,7 +35,7 @@ func parseClientConfig(args []string) {
 }
 
 // 从配置文件中加载配置
-func loadClientConfig() {
+func _loadClientConfig() {
 	cfg, err := ini.Load("config.ini")
 	if err != nil {
 		log.Fatalln("Fail to load config.ini", err.Error())
@@ -50,12 +44,20 @@ func loadClientConfig() {
 	client := func(key string) *ini.Key {
 		return cfg.Section("client").Key(key)
 	}
-	serverAddr := client("server-host").String()
-	localAddr := client("local-host").String()
+	_serverAddr := client("server-host").String()
+	_localAddr := client("local-host").String()
 	maxRedialTimes, err := client("max-redial-times").Int()
 	if err != nil {
 		maxRedialTimes = 20
 	}
+
+	// 解析地址
+	serverAddr, ok1 := ParseNetAddress(_serverAddr)
+	localAddr, ok2 := ParseNetAddresses(_localAddr)
+	if !ok1 || !ok2 {
+		log.Fatalln("Fail to parse address, the format is 'ip:port', such as '127.0.0.1:1024'")
+	}
+
 	clientConfig = ClientConfig{
 		ServerAddr:     serverAddr,
 		LocalAddr:      localAddr,
@@ -67,9 +69,9 @@ func loadClientConfig() {
 // 初始化客户端配置，支持从参数中读取或者从配置文件中读取
 func InitClientConfig(args []string) ClientConfig {
 	if len(args) == 0 {
-		loadClientConfig()
+		_loadClientConfig()
 	} else {
-		parseClientConfig(args)
+		_parseClientConfig(args)
 	}
 	return clientConfig
 }

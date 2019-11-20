@@ -27,12 +27,12 @@ const (
 var serverConfig ServerConfig
 
 // 检查 PortMode 合法性
-func checkPortMode(portMode int) bool {
+func _checkPortMode(portMode int) bool {
 	return portMode >= 0 && portMode <= 2
 }
 
 // 从参数中解析配置
-func parseServerConfig(args []string) {
+func _parseServerConfig(args []string) {
 	if len(args) == 0 {
 		log.Fatalln("More args in need")
 	}
@@ -42,7 +42,7 @@ func parseServerConfig(args []string) {
 	if len(args) >= 2 {
 		portMode, err = strconv.Atoi(strings.TrimSpace(args[1]))
 	}
-	if err != nil || !checkPort(port) || !checkPortMode(portMode) {
+	if err != nil || !checkPort(port) || !_checkPortMode(portMode) {
 		log.Fatalln("Fail to parse args.", args)
 	}
 	serverConfig = ServerConfig{Port: port, PortMode: portMode}
@@ -50,7 +50,7 @@ func parseServerConfig(args []string) {
 }
 
 // 从配置文件中加载配置
-func loadServerConfig() {
+func _loadServerConfig() {
 	cfg, err := ini.Load("config.ini")
 	if err != nil {
 		log.Fatalln("Fail to load config.ini", err.Error())
@@ -72,9 +72,9 @@ func loadServerConfig() {
 // 初始化服务端配置，支持从参数中读取或者从配置文件中读取
 func InitServerConfig(args []string) ServerConfig {
 	if len(args) == 0 {
-		loadServerConfig()
+		_loadServerConfig()
 	} else {
-		parseServerConfig(args)
+		_parseServerConfig(args)
 	}
 	return serverConfig
 }

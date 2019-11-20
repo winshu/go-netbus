@@ -7,11 +7,12 @@ import (
 	"time"
 )
 
-func dial(targetAddr string, maxRedialTimes int) net.Conn {
+// 拨号
+func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*最大重拨次数*/) net.Conn {
 	redialTimes := 0
 	for {
 		log.Println("Dial to", targetAddr)
-		conn, err := net.Dial("tcp", targetAddr)
+		conn, err := net.Dial("tcp", targetAddr.String())
 		if err == nil {
 			log.Println("Dial success ->", targetAddr)
 			return conn
@@ -29,33 +30,42 @@ func dial(targetAddr string, maxRedialTimes int) net.Conn {
 	}
 }
 
+func _requestHeader(serverConn net.Conn, localAddr config.NetAddress) (config.NetAddress, bool) {
+	if !sendHeader(serverConn, localAddr) {
+		return config.NetAddress{}, false
+	}
+	header, ok := receiveHeader(serverConn)
+	if !ok {
+		log.Println("Send header error")
+		return config.NetAddress{}, false
+	}
+	return header, true
+}
+
 // 处理客户端连接
-func handleClientConn(localAddr, serverAddr string, maxRedialTimes int) {
+func _handleClientConn(localAddr, serverAddr config.NetAddress, maxRedialTimes int) {
 	for {
 		// 本地服务拨号
-		conn := dial(localAddr, maxRedialTimes)
+		conn := _dial(localAddr, maxRedialTimes)
 		if conn == nil {
 			return
 		}
 		// 代理服务拨号
-		serverConn := dial(serverAddr, maxRedialTimes)
+		serverConn := _dial(serverAddr, maxRedialTimes)
 		if serverConn == nil {
 			return
 		}
-		// 写消息头
-		header := FormatHeader(localAddr)
-		_, err := serverConn.Write([]byte(header))
-		if err != nil {
-			log.Println("Send header error", err.Error())
-			return
+		// 请求头
+		if header, ok := _requestHeader(serverConn, localAddr); ok {
+			log.Println("Access address", header)
+			forward(conn, serverConn)
 		}
-		forward(conn, serverConn)
 	}
 }
 
 func Client(cfg config.ClientConfig) {
-	for _, addr := range cfg.GetLocalAddr() {
-		go handleClientConn(addr, cfg.ServerAddr, cfg.MaxRedialTimes)
+	for _, addr := range cfg.LocalAddr {
+		go _handleClientConn(addr, cfg.ServerAddr, cfg.MaxRedialTimes)
 	}
 	select {}
 }

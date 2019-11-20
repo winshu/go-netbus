@@ -10,7 +10,7 @@ import (
 // -----------------------------------------------------------------------------
 
 func init() {
-	log.SetFlags(log.Lshortfile | log.LstdFlags)
+	log.SetFlags(log.Lshortfile | log.LstdFlags | log.Lmicroseconds)
 }
 
 // netbus
@@ -24,8 +24,8 @@ func TestServer(t *testing.T) {
 
 func TestClient(t *testing.T) {
 	cfg := config.ClientConfig{
-		ServerAddr:     "127.0.0.1:6666",
-		LocalAddr:      "127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7456",
+		ServerAddr:     config.NetAddress{IP: "10.3.8.119", Port: 6666},
+		LocalAddr:      []config.NetAddress{{"127.0.0.1", 7456}},
 		MaxRedialTimes: 10,
 	}
 	core.Client(cfg)

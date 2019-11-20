@@ -17,6 +17,21 @@ func (t NetAddress) String() string {
 	return fmt.Sprintf("%s:%d", t.IP, t.Port)
 }
 
+// 解析多个地址
+func ParseNetAddresses(addresses string) ([]NetAddress, bool) {
+	arr := strings.Split(addresses, ",")
+	result := make([]NetAddress, len(arr))
+
+	var ok bool
+	for i, addr := range arr {
+		result[i], ok = ParseNetAddress(addr)
+		if !ok {
+			return nil, false
+		}
+	}
+	return result, true
+}
+
 // 解析地址
 func ParseNetAddress(address string) (NetAddress, bool) {
 	arr := strings.Split(strings.TrimSpace(address), ":")
@@ -39,16 +54,6 @@ func ParseNetAddress(address string) (NetAddress, bool) {
 	}
 
 	return NetAddress{ip, port}, true
-}
-
-// 检查地址是否合法，支持多个
-func checkNetAddress(addresses string) bool {
-	for _, addr := range strings.Split(addresses, ",") {
-		if _, ok := ParseNetAddress(addr); !ok {
-			return false
-		}
-	}
-	return true
 }
 
 // 检查端口是否合法

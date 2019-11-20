@@ -6,24 +6,26 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
 
 // 监听端口
-func listen(port int) net.Listener {
-	host := fmt.Sprintf("0.0.0.0:%d", port)
-	listener, err := net.Listen("tcp", host)
+func _listen(port int) net.Listener {
+	address := fmt.Sprintf("0.0.0.0:%d", port)
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Println("Listen failed, the port may be used or closed", port)
 		return nil
 	}
-	log.Println("Listening at address", host)
+	log.Println("Listening at address", address)
 	return listener
 }
 
 // 受理请求
-func accept(listener net.Listener) net.Conn {
+func _accept(listener net.Listener) net.Conn {
 	conn, err := listener.Accept()
 	if err != nil {
 		log.Println("Accept connect failed ->", conn.RemoteAddr(), err.Error())
@@ -33,31 +35,51 @@ func accept(listener net.Listener) net.Conn {
 	return conn
 }
 
-// 接收消息头，包含了地址信息
-func receiveHeader(conn net.Conn) (config.NetAddress, bool) {
-	buffer := make([]byte, headerLengthInByte)
-	_, err := conn.Read(buffer)
-	if err != nil {
-		log.Println("Receive header failed", err.Error())
-		_ = conn.Close()
-		return config.NetAddress{}, false
+// 所有访问监听器
+// key:   NetAddress.String()
+// value: net.Listener
+var listeners sync.Map
+
+// 根据地址获取已建立的监听，如果不存在则创建监听
+func _loadOrStore(originalAddr config.NetAddress, portMode int) net.Listener {
+	listener, exists := listeners.Load(originalAddr.String())
+	if !exists {
+		proxyPort := config.NewProxyPort(portMode, originalAddr.Port)
+		listener = _listen(proxyPort)
+		listeners.Store(originalAddr.String(), listener)
 	}
-	address, _ := config.ParseNetAddress(string(buffer))
-	log.Println("Receive header", address)
-	return address, true
+	return listener.(net.Listener)
+}
+
+func _buildAccessAddress(conn net.Conn, listener net.Listener) config.NetAddress {
+	serverAddress := conn.RemoteAddr().String()
+	ipIndex := strings.LastIndex(serverAddress, ":")
+
+	listenerAddress := listener.Addr().String()
+	portIndex := strings.LastIndex(listenerAddress, ":")
+	port, _ := strconv.Atoi(listenerAddress[portIndex+1:])
+
+	return config.NetAddress{IP: serverAddress[:ipIndex], Port: port}
 }
 
 // 处理连接
-func handleServerConn(conn net.Conn, cfg config.ServerConfig) {
+func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 	// 接收消息头，并检查端口是否可代理
 	address, ok := receiveHeader(conn)
 	if !ok || !config.CheckProxyPort(cfg.PortMode, address.Port) {
 		return
 	}
 	// 取出监听
-	listener := loadOrStore(address, cfg.PortMode)
+	listener := _loadOrStore(address, cfg.PortMode)
+	// 回写访问地址
+	header := _buildAccessAddress(conn, listener)
+	log.Println("Access address", header)
+	if !sendHeader(conn, header) {
+		return
+	}
+
 	// 代理连接
-	proxyConn := accept(listener)
+	proxyConn := _accept(listener)
 	if conn == nil || proxyConn == nil {
 		log.Println("Accept client failed, retry after", retryIntervalTime, "seconds")
 		time.Sleep(retryIntervalTime * time.Second)
@@ -66,32 +88,16 @@ func handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 	forward(conn, proxyConn)
 }
 
-// 所有访问监听器
-// key:   NetAddress.String()
-// value: net.Listener
-var listeners sync.Map
-
-// 根据地址获取已建立的监听，如果不存在则创建监听
-func loadOrStore(originalAddr config.NetAddress, portMode int) net.Listener {
-	listener, exists := listeners.Load(originalAddr.String())
-	if !exists {
-		proxyPort := config.NewProxyPort(portMode, originalAddr.Port)
-		listener = listen(proxyPort)
-		listeners.Store(originalAddr.String(), listener)
-	}
-	return listener.(net.Listener)
-}
-
 func Server(cfg config.ServerConfig) {
-	serverListener := listen(cfg.Port)
+	serverListener := _listen(cfg.Port)
 	if serverListener == nil {
 		os.Exit(1)
 	}
 	// TODO 需要记录已使用的端口
 	for {
-		conn := accept(serverListener)
+		conn := _accept(serverListener)
 		if conn != nil {
-			go handleServerConn(conn, cfg)
+			go _handleServerConn(conn, cfg)
 		}
 	}
 }
