@@ -3,6 +3,7 @@ package main
 import (
 	"./config"
 	"./core"
+	"./nb"
 	"fmt"
 	"log"
 	"os"
@@ -49,8 +50,25 @@ func main() {
 		serverConfig := config.InitServerConfig(argsConfig)
 		core.Server(serverConfig)
 	case "-client":
+		// 外网
 		clientConfig := config.InitClientConfig(argsConfig)
 		core.Client(clientConfig)
+	case "-nb_transmit":
+		// 隐藏彩蛋，支持端口转发
+		if len(argsConfig) == 2 {
+			nb.Port2Host(argsConfig[0], argsConfig[1])
+		}
+	case "-nb_server":
+		// 隐藏彩蛋，支持端口转发
+		if len(argsConfig) == 2 {
+			nb.Port2Port(argsConfig[0], argsConfig[1])
+		}
+	case "-nb_client":
+		// 隐藏彩蛋，支持端口转发
+		if len(argsConfig) == 2 {
+			// 隐藏彩蛋，支持端口转发
+			nb.Host2Host(argsConfig[0], argsConfig[1])
+		}
 	default:
 		printHelp()
 	}
