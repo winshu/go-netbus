@@ -73,7 +73,6 @@ func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 	listener := _loadOrStore(address, cfg.PortMode)
 	// 回写访问地址
 	header := _buildAccessAddress(conn, listener)
-	log.Println("Access address", header)
 	if !sendHeader(conn, header) {
 		closeConn(conn)
 		return

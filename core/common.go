@@ -67,7 +67,7 @@ func receiveHeader(conn net.Conn) (config.NetAddress, bool) {
 		return config.NetAddress{}, false
 	}
 	header := strings.TrimSpace(string(buffer))
-	log.Println("Receive header", header)
+	log.Println("-----------------------------------------> Receive header", header)
 	address, _ := config.ParseNetAddress(header)
 	return address, true
 }
