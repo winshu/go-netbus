@@ -2,6 +2,7 @@ package core
 
 import (
 	"../config"
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -24,7 +25,7 @@ type Header struct {
 
 func (h Header) String() string {
 	ports := strings.Replace(strings.Trim(fmt.Sprint(h.Ports), "[]"), " ", ",", -1)
-	return fmt.Sprintf("%d|%d|%s", h.Result, h.Mode, ports)
+	return fmt.Sprintf("%d|%d|%d|%s", h.Result, h.Type, h.Mode, ports)
 }
 
 func connCopy(source, target net.Conn, wg *sync.WaitGroup) {
@@ -49,10 +50,21 @@ func forward(conn1, conn2 net.Conn) {
 	wg.Wait()
 }
 
+func closeConn(conn net.Conn) {
+	if conn != nil {
+		_ = conn.Close()
+	}
+}
+
 // 消息头：长度|代理模式|端口列表
 // 举例:  6|0|7001,7002,7003
 // 发送消息头，包含了地址信息
 func sendHeader(conn net.Conn, header Header) bool {
+	length := byte(len(header.String()))
+	buffer := bytes.NewBuffer([]byte{})
+	buffer.WriteByte(length)
+	buffer.WriteString(header.String())
+
 	if _, err := conn.Write([]byte(header.String())); err != nil {
 		log.Printf("Send header failed. [%s] %s\n", header.String(), err.Error())
 		_ = conn.Close()
@@ -83,10 +95,4 @@ func receiveHeader(conn net.Conn) (config.NetAddress, bool) {
 	log.Println("-----------------------------------------> Receive header", header)
 	address, _ := config.ParseNetAddress(header)
 	return address, true
-}
-
-func closeConn(conn net.Conn) {
-	if conn != nil {
-		_ = conn.Close()
-	}
 }

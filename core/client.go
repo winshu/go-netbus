@@ -67,10 +67,10 @@ func _handleClientConn(index int, cfg config.ClientConfig) {
 	}
 }
 
-func _auth(cfg config.ClientConfig) {
+func _auth(cfg config.ClientConfig) bool {
 	serverConn := _dial(cfg.ServerAddr, cfg.MaxRedialTimes)
 	if serverConn == nil {
-		return
+		return false
 	}
 
 	// 验证身份
@@ -78,12 +78,14 @@ func _auth(cfg config.ClientConfig) {
 		Type:  1,
 		Ports: cfg.AccessPort,
 	}
-	sendHeader(header)
-
+	return sendHeader(serverConn, header)
 }
 
 func Client(cfg config.ClientConfig) {
 	// 身份验证
+	if !_auth(cfg) {
+		log.Fatalln("Fail to auth")
+	}
 
 	for i, _ := range cfg.LocalAddr {
 		go _handleClientConn(i, cfg)
