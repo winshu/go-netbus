@@ -1,41 +1,78 @@
 package config
 
 import (
+	"../util"
 	"github.com/go-ini/ini"
 	"log"
+	"strconv"
 	"strings"
 )
 
+const (
+	// 默认最大重连次数
+	defaultMaxRedialTimes = 20
+)
+
+// 客户端配置
 type ClientConfig struct {
-	ServerAddr     NetAddress
-	LocalAddr      []NetAddress
-	MaxRedialTimes int
+	Key            string       // 参考服务端配置 custom-port-key random-port-key
+	ServerAddr     NetAddress   // 服务端地址
+	LocalAddr      []NetAddress // 内网服务地址
+	AccessPort     []int        // 代理访问端口(不能为空)
+	MaxRedialTimes int          // 最大重连次数
 }
 
 var clientConfig ClientConfig
 
+// TODO 如果 AccessPort 不为空，需要校验长度是否与 LocalAddr 一致
+
 // 从参数中解析配置
-func _parseClientConfig(args []string) {
-	if len(args) < 2 {
+func _parseClientConfig(args []string) ClientConfig {
+	if len(args) < 3 {
 		log.Fatalln("More args in need.", args)
 	}
-	// 解析地址
-	serverAddr, ok1 := ParseNetAddress(strings.TrimSpace(args[0]))
-	localAddr, ok2 := ParseNetAddresses(strings.TrimSpace(args[1]))
-	if !ok1 || !ok2 {
-		log.Fatalln("Fail to parse address, the format is 'ip:port', such as '127.0.0.1:1024'")
-	}
 
-	clientConfig = ClientConfig{
-		ServerAddr:     serverAddr,
-		LocalAddr:      localAddr,
-		MaxRedialTimes: 20,
+	config := ClientConfig{MaxRedialTimes: defaultMaxRedialTimes}
+	var ok bool
+
+	// 1 Key
+	config.Key = strings.TrimSpace(args[0])
+	// 2 ServerAddr
+	if config.ServerAddr, ok = ParseNetAddress(strings.TrimSpace(args[1])); !ok {
+		log.Fatalln("Fail to parse ServerAddr")
 	}
-	log.Println("Init client config from args finished", clientConfig)
+	// 3 LocalAddr
+	if config.LocalAddr, ok = ParseNetAddresses(strings.TrimSpace(args[2])); !ok {
+		log.Fatalln("Fail to parse LocalAddr")
+	}
+	// 4 AccessPort
+	var accessPort []int
+	var err error
+
+	if len(args) >= 4 {
+		if accessPort, err = util.AtoInt2(args[3]); err != nil {
+			log.Fatalln("Fail to parse AccessPort")
+		}
+	}
+	// 如果未配置访问端口，则访问端口与内网服务端口相同
+	if len(accessPort) == 0 {
+		accessPort = extractPort(config.LocalAddr)
+	}
+	// 如果访问端口与内网服务地址不一样，则配置检查不通过
+	if len(accessPort) != len(config.LocalAddr) {
+		log.Fatalln("len(AccessPort) must equals len(LocalAddr)")
+	}
+	// 5 MaxRedialTimes
+	if len(args) >= 5 {
+		if config.MaxRedialTimes, err = strconv.Atoi(args[4]); err != nil {
+			log.Fatalln("Fail to parse MaxRedialTimes")
+		}
+	}
+	return config
 }
 
 // 从配置文件中加载配置
-func _loadClientConfig() {
+func _loadClientConfig() ClientConfig {
 	cfg, err := ini.Load("config.ini")
 	if err != nil {
 		log.Fatalln("Fail to load config.ini", err.Error())
@@ -44,34 +81,24 @@ func _loadClientConfig() {
 	client := func(key string) *ini.Key {
 		return cfg.Section("client").Key(key)
 	}
-	_serverAddr := client("server-host").String()
-	_localAddr := client("local-host").String()
-	maxRedialTimes, err := client("max-redial-times").Int()
-	if err != nil {
-		maxRedialTimes = 20
-	}
+	args := make([]string, 5)
 
-	// 解析地址
-	serverAddr, ok1 := ParseNetAddress(_serverAddr)
-	localAddr, ok2 := ParseNetAddresses(_localAddr)
-	if !ok1 || !ok2 {
-		log.Fatalln("Fail to parse address, the format is 'ip:port', such as '127.0.0.1:1024'")
-	}
+	args[0] = client("key").String()
+	args[1] = client("server-host").String()
+	args[2] = client("local-host").String()
+	args[3] = client("access-port").String()
+	args[4] = client("max-redial-times").String()
 
-	clientConfig = ClientConfig{
-		ServerAddr:     serverAddr,
-		LocalAddr:      localAddr,
-		MaxRedialTimes: maxRedialTimes,
-	}
-	log.Println("Init client config from config.ini finished", clientConfig)
+	return _parseClientConfig(args)
 }
 
 // 初始化客户端配置，支持从参数中读取或者从配置文件中读取
 func InitClientConfig(args []string) ClientConfig {
 	if len(args) == 0 {
-		_loadClientConfig()
+		clientConfig = _loadClientConfig()
 	} else {
-		_parseClientConfig(args)
+		clientConfig = _parseClientConfig(args)
 	}
+	log.Println("Init client config from args finished", clientConfig)
 	return clientConfig
 }

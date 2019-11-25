@@ -3,6 +3,8 @@ package test
 import (
 	"../config"
 	"../core"
+	"../util"
+	"fmt"
 	"log"
 	"testing"
 )
@@ -16,19 +18,28 @@ func init() {
 // netbus
 func TestServer(t *testing.T) {
 	cfg := config.ServerConfig{
-		Port:     6666,
-		PortMode: 2,
+		Port:          6666,
+		CustomPortKey: "custom",
+		RandomPortKey: "random",
 	}
 	core.Server(cfg)
 }
 
 func TestClient(t *testing.T) {
 	cfg := config.ClientConfig{
-		ServerAddr: config.NetAddress{IP: "10.3.8.119", Port: 6666},
+		Key: "custom",
+		ServerAddr: config.NetAddress{
+			IP: "127.0.0.1", Port: 6666,
+		},
 		LocalAddr: []config.NetAddress{
 			{"127.0.0.1", 7456},
 		},
+		AccessPort:     []int{8000},
 		MaxRedialTimes: 10,
 	}
 	core.Client(cfg)
+}
+
+func TestHeader(t *testing.T) {
+	fmt.Println(util.RandToken("abcde", 10))
 }
