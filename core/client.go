@@ -30,17 +30,17 @@ func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*�
 	}
 }
 
-func _requestHeader(serverConn net.Conn, localAddr config.NetAddress) (config.NetAddress, bool) {
-	header := Header{Result: 0, Mode: 1, Ports: []int{7001}}
-	if !sendHeader(serverConn, header) {
-		return config.NetAddress{}, false
+func _requestHeader(serverConn net.Conn) (Header, bool) {
+	reqHeader := Header{Token: token}
+	if !sendHeader(serverConn, reqHeader) {
+		return Header{}, false
 	}
-	msg, ok := receiveHeader(serverConn)
+	respHeader, ok := receiveHeader(serverConn)
 	if !ok {
 		log.Println("Send header error")
-		return config.NetAddress{}, false
+		return Header{}, false
 	}
-	return msg, true
+	return respHeader, true
 }
 
 // 处理客户端连接
@@ -57,7 +57,7 @@ func _handleClientConn(index int, cfg config.ClientConfig) {
 			return
 		}
 		// 请求头
-		if _, ok := _requestHeader(serverConn, index, cfg); ok {
+		if _, ok := _requestHeader(serverConn); ok {
 			forward(conn, serverConn)
 		} else {
 			// 关闭连接
@@ -77,11 +77,21 @@ func _auth(cfg config.ClientConfig) bool {
 	header := Header{
 		Type:  1,
 		Ports: cfg.AccessPort,
+		Token: token,
 	}
-	return sendHeader(serverConn, header)
+	if !sendHeader(serverConn, header) {
+		return false
+	}
+	_, ok := receiveHeader(serverConn)
+	return ok
 }
 
+// 客户端令牌，每次启动时生成
+var token string
+
 func Client(cfg config.ClientConfig) {
+	token = "123456"
+
 	// 身份验证
 	if !_auth(cfg) {
 		log.Fatalln("Fail to auth")

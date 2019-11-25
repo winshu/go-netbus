@@ -64,13 +64,14 @@ func _buildAccessAddress(conn net.Conn, listener net.Listener) config.NetAddress
 // 处理连接
 func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 	// 接收消息头，并检查端口是否可代理
-	address, ok := receiveHeader(conn)
-	if !ok || !config.CheckProxyPort(cfg.PortMode, address.Port) {
+	header, ok := receiveHeader(conn)
+	fmt.Println(header)
+	if !ok {
 		closeConn(conn)
 		return
 	}
 	// 取出监听
-	listener := _loadOrStore(address, cfg.PortMode)
+	listener := _loadOrStore(config.NetAddress{}, cfg.PortMode)
 	// 回写访问地址
 	//header := _buildAccessAddress(conn, listener)
 	//if !sendHeader(conn, header) {
