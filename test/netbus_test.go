@@ -3,6 +3,7 @@ package test
 import (
 	"../config"
 	"../core"
+	"fmt"
 	"log"
 	"testing"
 )
@@ -31,4 +32,10 @@ func TestClient(t *testing.T) {
 		MaxRedialTimes: 10,
 	}
 	core.Client(cfg)
+}
+
+func TestHeader(t *testing.T) {
+	for i, v := range []int{3, 4, 5, 6} {
+		fmt.Println(i, v)
+	}
 }

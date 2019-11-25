@@ -9,6 +9,7 @@ import (
 type ClientConfig struct {
 	ServerAddr     NetAddress
 	LocalAddr      []NetAddress
+	AccessPort     []int
 	MaxRedialTimes int
 }
 
@@ -46,6 +47,7 @@ func _loadClientConfig() {
 	}
 	_serverAddr := client("server-host").String()
 	_localAddr := client("local-host").String()
+	//_accessPort := client("access-port").String()
 	maxRedialTimes, err := client("max-redial-times").Int()
 	if err != nil {
 		maxRedialTimes = 20
@@ -61,6 +63,7 @@ func _loadClientConfig() {
 	clientConfig = ClientConfig{
 		ServerAddr:     serverAddr,
 		LocalAddr:      localAddr,
+		AccessPort:     []int{7001},
 		MaxRedialTimes: maxRedialTimes,
 	}
 	log.Println("Init client config from config.ini finished", clientConfig)

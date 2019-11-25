@@ -31,32 +31,33 @@ func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*�
 }
 
 func _requestHeader(serverConn net.Conn, localAddr config.NetAddress) (config.NetAddress, bool) {
-	if !sendHeader(serverConn, localAddr) {
+	header := Header{Result: 0, Mode: 1, Ports: []int{7001}}
+	if !sendHeader(serverConn, header) {
 		return config.NetAddress{}, false
 	}
-	header, ok := receiveHeader(serverConn)
+	msg, ok := receiveHeader(serverConn)
 	if !ok {
 		log.Println("Send header error")
 		return config.NetAddress{}, false
 	}
-	return header, true
+	return msg, true
 }
 
 // 处理客户端连接
-func _handleClientConn(localAddr, serverAddr config.NetAddress, maxRedialTimes int) {
+func _handleClientConn(index int, cfg config.ClientConfig) {
 	for {
 		// 本地服务拨号
-		conn := _dial(localAddr, maxRedialTimes)
+		conn := _dial(cfg.LocalAddr[index], cfg.MaxRedialTimes)
 		if conn == nil {
 			return
 		}
 		// 代理服务拨号
-		serverConn := _dial(serverAddr, maxRedialTimes)
+		serverConn := _dial(cfg.ServerAddr, cfg.MaxRedialTimes)
 		if serverConn == nil {
 			return
 		}
 		// 请求头
-		if _, ok := _requestHeader(serverConn, localAddr); ok {
+		if _, ok := _requestHeader(serverConn, index, cfg); ok {
 			forward(conn, serverConn)
 		} else {
 			// 关闭连接
@@ -66,9 +67,26 @@ func _handleClientConn(localAddr, serverAddr config.NetAddress, maxRedialTimes i
 	}
 }
 
+func _auth(cfg config.ClientConfig) {
+	serverConn := _dial(cfg.ServerAddr, cfg.MaxRedialTimes)
+	if serverConn == nil {
+		return
+	}
+
+	// 验证身份
+	header := Header{
+		Type:  1,
+		Ports: cfg.AccessPort,
+	}
+	sendHeader(header)
+
+}
+
 func Client(cfg config.ClientConfig) {
-	for _, addr := range cfg.LocalAddr {
-		go _handleClientConn(addr, cfg.ServerAddr, cfg.MaxRedialTimes)
+	// 身份验证
+
+	for i, _ := range cfg.LocalAddr {
+		go _handleClientConn(i, cfg)
 	}
 	select {}
 }
