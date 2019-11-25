@@ -7,6 +7,7 @@ import (
 )
 
 type ClientConfig struct {
+	Key            string
 	ServerAddr     NetAddress
 	LocalAddr      []NetAddress
 	AccessPort     []int
@@ -17,17 +18,19 @@ var clientConfig ClientConfig
 
 // 从参数中解析配置
 func _parseClientConfig(args []string) {
-	if len(args) < 2 {
+	if len(args) < 3 {
 		log.Fatalln("More args in need.", args)
 	}
+	key := strings.TrimSpace(args[0])
 	// 解析地址
-	serverAddr, ok1 := ParseNetAddress(strings.TrimSpace(args[0]))
-	localAddr, ok2 := ParseNetAddresses(strings.TrimSpace(args[1]))
+	serverAddr, ok1 := ParseNetAddress(strings.TrimSpace(args[1]))
+	localAddr, ok2 := ParseNetAddresses(strings.TrimSpace(args[2]))
 	if !ok1 || !ok2 {
 		log.Fatalln("Fail to parse address, the format is 'ip:port', such as '127.0.0.1:1024'")
 	}
 
 	clientConfig = ClientConfig{
+		Key:            key,
 		ServerAddr:     serverAddr,
 		LocalAddr:      localAddr,
 		MaxRedialTimes: 20,

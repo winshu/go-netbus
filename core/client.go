@@ -2,6 +2,8 @@ package core
 
 import (
 	"../config"
+	"../util"
+	"fmt"
 	"log"
 	"net"
 	"time"
@@ -30,34 +32,30 @@ func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*�
 	}
 }
 
-func _requestHeader(serverConn net.Conn) (Header, bool) {
-	reqHeader := Header{Token: token}
+func _requestHeader(serverConn net.Conn, token string, accessPort int) Header {
+	tokenX := fmt.Sprintf("%s%d", token, accessPort)
+	reqHeader := Header{Token: tokenX, Ports: []int{accessPort}}
 	if !sendHeader(serverConn, reqHeader) {
-		return Header{}, false
+		return Header{Result: 0}
 	}
-	respHeader, ok := receiveHeader(serverConn)
-	if !ok {
-		log.Println("Send header error")
-		return Header{}, false
-	}
-	return respHeader, true
+	return receiveHeader(serverConn)
 }
 
 // 处理客户端连接
-func _handleClientConn(index int, cfg config.ClientConfig) {
+func _handleClientConn(token string, local config.NetAddress, server config.NetAddress, accessPort int, maxRedialTimes int) {
 	for {
 		// 本地服务拨号
-		conn := _dial(cfg.LocalAddr[index], cfg.MaxRedialTimes)
+		conn := _dial(local, maxRedialTimes)
 		if conn == nil {
 			return
 		}
 		// 代理服务拨号
-		serverConn := _dial(cfg.ServerAddr, cfg.MaxRedialTimes)
+		serverConn := _dial(server, maxRedialTimes)
 		if serverConn == nil {
 			return
 		}
 		// 请求头
-		if _, ok := _requestHeader(serverConn); ok {
+		if header := _requestHeader(serverConn, token, accessPort); header.Result == 1 {
 			forward(conn, serverConn)
 		} else {
 			// 关闭连接
@@ -67,38 +65,44 @@ func _handleClientConn(index int, cfg config.ClientConfig) {
 	}
 }
 
-func _auth(cfg config.ClientConfig) bool {
+func _auth(token string, cfg config.ClientConfig) Header {
 	serverConn := _dial(cfg.ServerAddr, cfg.MaxRedialTimes)
 	if serverConn == nil {
-		return false
+		return Header{}
+	}
+	// 验证身份
+	// 如果没有配置固定端口
+	ports := cfg.AccessPort
+	if len(ports) == 0 {
+		ports = make([]int, len(cfg.LocalAddr))
+		for i, addr := range cfg.LocalAddr {
+			ports[i] = addr.Port
+		}
 	}
 
-	// 验证身份
 	header := Header{
-		Type:  1,
-		Ports: cfg.AccessPort,
+		Type:  1, // 鉴权
+		Ports: ports,
 		Token: token,
 	}
 	if !sendHeader(serverConn, header) {
-		return false
+		return Header{}
 	}
-	_, ok := receiveHeader(serverConn)
-	return ok
+	return receiveHeader(serverConn)
 }
 
-// 客户端令牌，每次启动时生成
-var token string
-
 func Client(cfg config.ClientConfig) {
-	token = "123456"
+	// token 随机生成
+	token := util.RandToken(cfg.Key, 16)
+	var header Header
 
 	// 身份验证
-	if !_auth(cfg) {
+	if header = _auth(token, cfg); header.Result != 1 {
 		log.Fatalln("Fail to auth")
 	}
-
-	for i, _ := range cfg.LocalAddr {
-		go _handleClientConn(i, cfg)
+	for i, local := range cfg.LocalAddr {
+		accessPort := header.Ports[i]
+		go _handleClientConn(token, local, cfg.ServerAddr, accessPort, cfg.MaxRedialTimes)
 	}
 	select {}
 }

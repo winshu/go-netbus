@@ -17,41 +17,43 @@ const (
 )
 
 type Header struct {
-	Result int
-	Type   int
-	Mode   int
-	Ports  []int
-	Token  string
+	Result int    // 结果：0 失败，1 成功
+	Type   int    // 消息类型：0 正常，1 鉴权
+	Ports  []int  // 端口列表
+	Token  string // 令牌
 }
 
 func (h *Header) String() string {
 	ports := strings.Replace(strings.Trim(fmt.Sprint(h.Ports), "[]"), " ", ",", -1)
-	return fmt.Sprintf("%d|%d|%d|%s|%s", h.Result, h.Type, h.Mode, ports, h.Token)
+	return fmt.Sprintf("%d|%d|%s|%s", h.Result, h.Type, ports, h.Token)
 }
 
-func ParseHeader(body string) (Header, bool) {
+func ParseHeader(body string) Header {
 	arr := strings.Split(body, "|")
-	if len(arr) != 5 {
-		return Header{}, false
+	if len(arr) != 4 {
+		return Header{}
 	}
-	params, err := util.Atoi(arr[0:3])
+	params, err := util.Atoi(arr[0:2])
 	if err != nil {
-		return Header{}, false
+		return Header{}
 	}
-	portsArr := strings.Split(arr[3], ",")
 	var ports []int
-	ports, err = util.Atoi(portsArr)
-	if err != nil {
-		return Header{}, false
+	if len(arr[2]) > 0 {
+		portsArr := strings.Split(arr[2], ",")
+		ports, err = util.Atoi(portsArr)
+		if err != nil {
+			return Header{}
+		}
+	} else {
+		ports = []int{}
 	}
 
 	return Header{
 		Result: params[0],
 		Type:   params[1],
-		Mode:   params[2],
 		Ports:  ports,
-		Token:  arr[4],
-	}, true
+		Token:  arr[3],
+	}
 }
 
 func connCopy(source, target net.Conn, wg *sync.WaitGroup) {
@@ -102,14 +104,13 @@ func sendHeader(conn net.Conn, header Header) bool {
 }
 
 // 接收消息头，包含了地址信息
-func receiveHeader(conn net.Conn) (Header, bool) {
+func receiveHeader(conn net.Conn) Header {
 	// 读取消息长度
 	buffer := make([]byte, 1)
 	_, err := conn.Read(buffer)
 	if err != nil {
 		log.Println("Receive header failed.", err.Error())
-		_ = conn.Close()
-		return Header{}, false
+		return Header{}
 	}
 	// 读取消息体
 	length := buffer[0]
@@ -117,8 +118,7 @@ func receiveHeader(conn net.Conn) (Header, bool) {
 	_, err = conn.Read(buffer)
 	if err != nil {
 		log.Println("Receive header failed.", err.Error())
-		_ = conn.Close()
-		return Header{}, false
+		return Header{}
 	}
 	// 解析消息
 	body := strings.TrimSpace(string(buffer))

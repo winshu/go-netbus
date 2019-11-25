@@ -4,9 +4,9 @@ import (
 	"../config"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -40,45 +40,77 @@ func _accept(listener net.Listener) net.Conn {
 var listeners sync.Map
 
 // 根据地址获取已建立的监听，如果不存在则创建监听
-func _loadOrStore(originalAddr config.NetAddress, portMode int) net.Listener {
-	listener, exists := listeners.Load(originalAddr.String())
-	if !exists {
-		proxyPort := config.NewProxyPort(portMode, originalAddr.Port)
-		listener = _listen(proxyPort)
-		listeners.Store(originalAddr.String(), listener)
+func _loadListener(key string) net.Listener {
+	listener, exists := listeners.Load(key)
+	if exists {
+		return listener.(net.Listener)
 	}
-	return listener.(net.Listener)
+	log.Println("Listener key not exists", key)
+	return nil
 }
 
-func _buildAccessAddress(conn net.Conn, listener net.Listener) config.NetAddress {
-	serverAddress := conn.RemoteAddr().String()
-	ipIndex := strings.LastIndex(serverAddress, ":")
-
-	listenerAddress := listener.Addr().String()
-	portIndex := strings.LastIndex(listenerAddress, ":")
-	port, _ := strconv.Atoi(listenerAddress[portIndex+1:])
-
-	return config.NetAddress{IP: serverAddress[:ipIndex], Port: port}
+// 创建访问端口
+func _makeAccessPort(header Header, cfg config.ServerConfig) ([]int, bool) {
+	if strings.HasPrefix(header.Token, cfg.CustomPortKey) {
+		// 允许自定义端口、同名端口
+		return header.Ports, true
+	} else if strings.HasPrefix(header.Token, cfg.RandomPortKey) {
+		// 允许随机端口
+		randPorts := make([]int, len(header.Ports))
+		for i := 0; i < len(header.Ports); i++ {
+			randPorts[i] = 60000 + rand.Intn(5535)
+		}
+		return randPorts, true
+	} else {
+		// 无权限访问
+		return nil, false
+	}
 }
 
 // 处理连接
 func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
-	// 接收消息头，并检查端口是否可代理
-	header, ok := receiveHeader(conn)
-	fmt.Println(header)
-	if !ok {
+	var listener net.Listener
+
+	header := receiveHeader(conn)
+	switch header.Type {
+	case 0:
+		// 正常通讯
+		// 取监听
+		listener = _loadListener(header.Token)
+	case 1:
+		// 鉴权
+		// 创建监听
+		accessPort, ok := _makeAccessPort(header, cfg)
+		// 失败
+		if !ok {
+			sendHeader(conn, Header{
+				Type:  1,
+				Ports: header.Ports,
+				Token: header.Token,
+			})
+			return
+		}
+
+		for _, port := range accessPort {
+			key := fmt.Sprintf("%s%d", header.Token, port)
+			listener = _listen(port)
+			listeners.Store(key, listener)
+		}
+
+		// 返回消息
+		sendHeader(conn, Header{
+			Result: 1,
+			Type:   1,
+			Ports:  accessPort,
+			Token:  header.Token,
+		})
+		// 正常关闭
+		closeConn(conn)
+		return
+	default:
 		closeConn(conn)
 		return
 	}
-	// 取出监听
-	listener := _loadOrStore(config.NetAddress{}, cfg.PortMode)
-	// 回写访问地址
-	//header := _buildAccessAddress(conn, listener)
-	//if !sendHeader(conn, header) {
-	//	closeConn(conn)
-	//	return
-	//}
-
 	// 代理连接
 	proxyConn := _accept(listener)
 	if conn != nil && proxyConn != nil {
@@ -94,7 +126,7 @@ func Server(cfg config.ServerConfig) {
 	if serverListener == nil {
 		os.Exit(1)
 	}
-	// TODO 需要记录已使用的端口
+
 	for {
 		conn := _accept(serverListener)
 		if conn != nil {
