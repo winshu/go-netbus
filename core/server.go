@@ -53,6 +53,9 @@ func _loadListener(conn net.Conn, protocol Protocol) net.Listener {
 		Ports:  protocol.Ports,
 		Token:  protocol.Token,
 	})
+	if listener == nil {
+		return nil
+	}
 	return listener.(net.Listener)
 }
 
@@ -127,13 +130,16 @@ func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 
 	switch protocol.Type {
 	case protocolTypeNormal:
-		listener = _loadListener(conn, protocol)
+		if listener = _loadListener(conn, protocol); listener == nil {
+			return
+		}
 	case protocolTypeAuth:
 		_buildListener(conn, protocol, cfg)
 		// 注意不能关闭连接
 		return
 	default:
 		// 非法类型
+		log.Println("Forbidden type", protocol)
 		closeConn(conn)
 		return
 	}

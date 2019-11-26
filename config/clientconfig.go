@@ -46,20 +46,19 @@ func _parseClientConfig(args []string) ClientConfig {
 		log.Fatalln("Fail to parse LocalAddr")
 	}
 	// 4 AccessPort
-	var accessPort []int
 	var err error
 
 	if len(args) >= 4 {
-		if accessPort, err = util.AtoInt2(args[3]); err != nil {
+		if config.AccessPort, err = util.AtoInt2(args[3]); err != nil {
 			log.Fatalln("Fail to parse AccessPort")
 		}
 	}
 	// 如果未配置访问端口，则访问端口与内网服务端口相同
-	if len(accessPort) == 0 {
-		accessPort = extractPorts(config.LocalAddr)
+	if len(config.AccessPort) == 0 {
+		config.AccessPort = extractPorts(config.LocalAddr)
 	}
 	// 如果访问端口与内网服务地址不一样，则配置检查不通过
-	if len(accessPort) != len(config.LocalAddr) {
+	if len(config.AccessPort) != len(config.LocalAddr) {
 		log.Fatalln("len(AccessPort) must equals len(LocalAddr)")
 	}
 	// 5 MaxRedialTimes

@@ -56,6 +56,7 @@ func _handleClientConn(token string, local config.NetAddress, server config.NetA
 		}
 		// 请求头
 		if protocol := _requestCommunication(serverConn, token, accessPort); protocol.Result == protocolResultSuccess {
+			log.Printf("Proxy address [%s] --> [%s:%d]\n", local, server.IP, protocol.Ports[0])
 			forward(conn, serverConn)
 		} else {
 			// 关闭连接
