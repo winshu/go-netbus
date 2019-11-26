@@ -128,6 +128,7 @@ func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 	case protocolTypeAuth:
 		_buildListener(conn, protocol, cfg)
 		closeConn(conn)
+		return
 	default:
 		// 非法类型
 		closeConn(conn)
