@@ -32,13 +32,14 @@ func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*�
 	}
 }
 
-func _requestHeader(serverConn net.Conn, token string, accessPort int) Header {
+// 请求正常通讯
+func _requestCommunication(serverConn net.Conn, token string, accessPort int) Protocol {
 	tokenX := fmt.Sprintf("%s%d", token, accessPort)
-	reqHeader := Header{Token: tokenX, Ports: []int{accessPort}}
-	if !sendHeader(serverConn, reqHeader) {
-		return Header{Result: 0}
+	reqProtocol := Protocol{Token: tokenX, Ports: []int{accessPort}}
+	if !sendProtocol(serverConn, reqProtocol) {
+		return Protocol{}
 	}
-	return receiveHeader(serverConn)
+	return receiveProtocol(serverConn)
 }
 
 // 处理客户端连接
@@ -55,7 +56,7 @@ func _handleClientConn(token string, local config.NetAddress, server config.NetA
 			return
 		}
 		// 请求头
-		if header := _requestHeader(serverConn, token, accessPort); header.Result == 1 {
+		if protocol := _requestCommunication(serverConn, token, accessPort); protocol.Result == protocolResultSuccess {
 			forward(conn, serverConn)
 		} else {
 			// 关闭连接
@@ -65,10 +66,11 @@ func _handleClientConn(token string, local config.NetAddress, server config.NetA
 	}
 }
 
-func _auth(token string, cfg config.ClientConfig) Header {
+// 鉴权
+func _requestAuth(token string, cfg config.ClientConfig) Protocol {
 	serverConn := _dial(cfg.ServerAddr, cfg.MaxRedialTimes)
 	if serverConn == nil {
-		return Header{}
+		return Protocol{}
 	}
 	// 验证身份
 	// 如果没有配置固定端口
@@ -80,28 +82,30 @@ func _auth(token string, cfg config.ClientConfig) Header {
 		}
 	}
 
-	header := Header{
-		Type:  1, // 鉴权
+	header := Protocol{
+		Type:  protocolTypeAuth, // 鉴权
 		Ports: ports,
 		Token: token,
 	}
-	if !sendHeader(serverConn, header) {
-		return Header{}
+	if !sendProtocol(serverConn, header) {
+		return Protocol{}
 	}
-	return receiveHeader(serverConn)
+	return receiveProtocol(serverConn)
 }
 
+// 入口
 func Client(cfg config.ClientConfig) {
 	// token 随机生成
 	token := util.RandToken(cfg.Key, 16)
-	var header Header
+	var protocol Protocol
 
-	// 身份验证
-	if header = _auth(token, cfg); header.Result != 1 {
+	// 鉴权
+	if protocol = _requestAuth(token, cfg); protocol.Result != 1 {
 		log.Fatalln("Fail to auth")
 	}
+	// 连接
 	for i, local := range cfg.LocalAddr {
-		accessPort := header.Ports[i]
+		accessPort := protocol.Ports[i]
 		go _handleClientConn(token, local, cfg.ServerAddr, accessPort, cfg.MaxRedialTimes)
 	}
 	select {}

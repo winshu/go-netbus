@@ -2,9 +2,9 @@ package core
 
 import (
 	"../config"
+	"../util"
 	"fmt"
 	"log"
-	"math/rand"
 	"net"
 	"os"
 	"strings"
@@ -35,79 +35,101 @@ func _accept(listener net.Listener) net.Conn {
 }
 
 // 所有访问监听器
-// key:   NetAddress.String()
+// key:   token
 // value: net.Listener
 var listeners sync.Map
 
-// 根据地址获取已建立的监听，如果不存在则创建监听
-func _loadListener(key string) net.Listener {
-	listener, exists := listeners.Load(key)
+// 从 listeners 中加载监听
+func _loadListener(conn net.Conn, protocol Protocol) net.Listener {
+	listener, exists := listeners.Load(protocol.Token)
+	result := protocolResultFail
 	if exists {
-		return listener.(net.Listener)
+		result = protocolResultSuccess
 	}
-	log.Println("Listener key not exists", key)
-	return nil
+	// 发送处理结果
+	sendProtocol(conn, Protocol{
+		Result: result,
+		Type:   protocolTypeAuth,
+		Ports:  protocol.Ports,
+		Token:  protocol.Token,
+	})
+	return listener.(net.Listener)
+}
+
+// 创建监听
+func _buildListener(conn net.Conn, protocol Protocol, cfg config.ServerConfig) bool {
+	// 创建访问端口
+	accessPort, ok := _makeAccessPort(protocol, cfg)
+	if !ok { // 失败，发送失败结果到客户端
+		sendProtocol(conn, Protocol{
+			Result: protocolResultFail,
+			Type:   protocolTypeAuth,
+			Ports:  protocol.Ports,
+			Token:  protocol.Token,
+		})
+		return false
+	}
+
+	// 创建监听失败
+	var listener net.Listener
+	for _, port := range accessPort {
+		// key = token + port
+		key := fmt.Sprintf("%s%d", protocol.Token, port)
+		// TODO 需要检查端口是否被占用
+		listener = _listen(port)
+		if listener == nil {
+			// 监听失败
+			sendProtocol(conn, Protocol{
+				Result: protocolResultFail,
+				Type:   protocolTypeAuth,
+				Ports:  accessPort,
+				Token:  protocol.Token,
+			})
+			return false
+		}
+		// 存放监听映射信息
+		listeners.Store(key, listener)
+	}
+
+	// 发送鉴权结果到客户端
+	return sendProtocol(conn, Protocol{
+		Result: protocolResultSuccess,
+		Type:   protocolTypeAuth,
+		Ports:  accessPort,
+		Token:  protocol.Token,
+	})
 }
 
 // 创建访问端口
-func _makeAccessPort(header Header, cfg config.ServerConfig) ([]int, bool) {
-	if strings.HasPrefix(header.Token, cfg.CustomPortKey) {
-		// 允许自定义端口、同名端口
-		return header.Ports, true
-	} else if strings.HasPrefix(header.Token, cfg.RandomPortKey) {
-		// 允许随机端口
-		randPorts := make([]int, len(header.Ports))
-		for i := 0; i < len(header.Ports); i++ {
-			randPorts[i] = 60000 + rand.Intn(5535)
-		}
-		return randPorts, true
-	} else {
-		// 无权限访问
+func _makeAccessPort(protocol Protocol, cfg config.ServerConfig) ([]int, bool) {
+	if len(protocol.Ports) == 0 {
 		return nil, false
 	}
+	if strings.HasPrefix(protocol.Token, cfg.CustomPortKey) {
+		// 允许自定义端口、同名端口
+		return protocol.Ports, true
+	} else if strings.HasPrefix(protocol.Token, cfg.RandomPortKey) {
+		// 允许随机端口
+		randPorts := util.RandPorts(len(protocol.Ports))
+		return randPorts, true
+	}
+	// 无权限访问
+	return nil, false
 }
 
 // 处理连接
 func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 	var listener net.Listener
+	protocol := receiveProtocol(conn)
 
-	header := receiveHeader(conn)
-	switch header.Type {
-	case 0:
-		// 正常通讯
-		// 取监听
-		listener = _loadListener(header.Token)
-	case 1:
-		// 鉴权
-		// 创建监听
-		accessPort, ok := _makeAccessPort(header, cfg)
-		// 失败
-		if !ok {
-			sendHeader(conn, Header{
-				Type:  1,
-				Ports: header.Ports,
-				Token: header.Token,
-			})
-			return
-		}
-
-		for _, port := range accessPort {
-			key := fmt.Sprintf("%s%d", header.Token, port)
-			listener = _listen(port)
-			listeners.Store(key, listener)
-		}
-
-		// 返回消息
-		sendHeader(conn, Header{
-			Result: 1,
-			Type:   1,
-			Ports:  accessPort,
-			Token:  header.Token,
-		})
-		// 正常关闭
+	switch protocol.Type {
+	case protocolTypeNormal:
+		listener = _loadListener(conn, protocol)
+	case protocolTypeAuth:
+		_buildListener(conn, protocol, cfg)
 		closeConn(conn)
-		return
 	default:
+		// 非法类型
 		closeConn(conn)
 		return
 	}
@@ -121,6 +143,7 @@ func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 	}
 }
 
+// 入口
 func Server(cfg config.ServerConfig) {
 	serverListener := _listen(cfg.Port)
 	if serverListener == nil {

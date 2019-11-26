@@ -1,6 +1,7 @@
 package config
 
 import (
+	"../util"
 	"github.com/go-ini/ini"
 	"log"
 	"strings"
@@ -16,6 +17,16 @@ type ClientConfig struct {
 
 var clientConfig ClientConfig
 
+// TODO 如果 AccessPort 不为空，需要校验长度是否与 LocalAddr 一致
+
+func _copyPort(localAddr []NetAddress) []int {
+	accessPort := make([]int, len(localAddr))
+	for i, addr := range localAddr {
+		accessPort[i] = addr.Port
+	}
+	return accessPort
+}
+
 // 从参数中解析配置
 func _parseClientConfig(args []string) {
 	if len(args) < 3 {
@@ -29,10 +40,23 @@ func _parseClientConfig(args []string) {
 		log.Fatalln("Fail to parse address, the format is 'ip:port', such as '127.0.0.1:1024'")
 	}
 
+	var accessPort []int
+	var err error
+	if len(args) >= 4 {
+		accessPort, err = util.AtoInt2(args[3])
+		if err != nil {
+			log.Fatalln("Fail to parse AccessPort")
+		}
+	}
+	if len(accessPort) == 0 {
+		accessPort = _copyPort(localAddr)
+	}
+
 	clientConfig = ClientConfig{
 		Key:            key,
 		ServerAddr:     serverAddr,
 		LocalAddr:      localAddr,
+		AccessPort:     accessPort,
 		MaxRedialTimes: 20,
 	}
 	log.Println("Init client config from args finished", clientConfig)
@@ -50,11 +74,6 @@ func _loadClientConfig() {
 	}
 	_serverAddr := client("server-host").String()
 	_localAddr := client("local-host").String()
-	//_accessPort := client("access-port").String()
-	maxRedialTimes, err := client("max-redial-times").Int()
-	if err != nil {
-		maxRedialTimes = 20
-	}
 
 	// 解析地址
 	serverAddr, ok1 := ParseNetAddress(_serverAddr)
@@ -63,10 +82,21 @@ func _loadClientConfig() {
 		log.Fatalln("Fail to parse address, the format is 'ip:port', such as '127.0.0.1:1024'")
 	}
 
+	_accessPort := client("access-port").String()
+	var accessPort []int
+	if len(_accessPort) == 0 {
+		accessPort = _copyPort(localAddr)
+	}
+
+	maxRedialTimes, err := client("max-redial-times").Int()
+	if err != nil {
+		maxRedialTimes = 20
+	}
+
 	clientConfig = ClientConfig{
 		ServerAddr:     serverAddr,
 		LocalAddr:      localAddr,
-		AccessPort:     []int{7001},
+		AccessPort:     accessPort,
 		MaxRedialTimes: maxRedialTimes,
 	}
 	log.Println("Init client config from config.ini finished", clientConfig)
