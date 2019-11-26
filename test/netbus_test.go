@@ -32,9 +32,9 @@ func TestClient(t *testing.T) {
 			IP: "127.0.0.1", Port: 6666,
 		},
 		LocalAddr: []config.NetAddress{
-			{"127.0.0.1", 7456},
+			{"127.0.0.1", 3306},
 		},
-		AccessPort:     []int{8000},
+		AccessPort:     []int{13306},
 		MaxRedialTimes: 10,
 	}
 	core.Client(cfg)

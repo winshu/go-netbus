@@ -44,15 +44,14 @@ func _requestCommunication(serverConn net.Conn, token string, accessPort int) Pr
 
 // 处理客户端连接
 func _handleClientConn(token string, local config.NetAddress, server config.NetAddress, accessPort int, maxRedialTimes int) {
+	var conn, serverConn net.Conn
 	for {
 		// 本地服务拨号
-		conn := _dial(local, maxRedialTimes)
-		if conn == nil {
+		if conn = _dial(local, maxRedialTimes); conn == nil {
 			return
 		}
 		// 代理服务拨号
-		serverConn := _dial(server, maxRedialTimes)
-		if serverConn == nil {
+		if serverConn = _dial(server, maxRedialTimes); serverConn == nil {
 			return
 		}
 		// 请求头
@@ -96,11 +95,11 @@ func _requestAuth(token string, cfg config.ClientConfig) Protocol {
 // 入口
 func Client(cfg config.ClientConfig) {
 	// token 随机生成
-	token := util.RandToken(cfg.Key, 16)
+	token := util.RandToken(cfg.Key, protocolTokenLength)
 	var protocol Protocol
 
 	// 鉴权
-	if protocol = _requestAuth(token, cfg); protocol.Result != 1 {
+	if protocol = _requestAuth(token, cfg); protocol.Result != protocolResultSuccess {
 		log.Fatalln("Fail to auth")
 	}
 	// 连接

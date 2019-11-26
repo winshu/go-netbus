@@ -41,7 +41,7 @@ var listeners sync.Map
 
 // 从 listeners 中加载监听
 func _loadListener(conn net.Conn, protocol Protocol) net.Listener {
-	listener, exists := listeners.Load(protocol.Token)
+	listener, exists := listeners.Load(protocol.Ports[0])
 	result := protocolResultFail
 	if exists {
 		result = protocolResultSuccess
@@ -73,9 +73,12 @@ func _buildListener(conn net.Conn, protocol Protocol, cfg config.ServerConfig) b
 	// 创建监听失败
 	var listener net.Listener
 	for _, port := range accessPort {
-		// key = token + port
-		key := fmt.Sprintf("%s%d", protocol.Token, port)
-		// TODO 需要检查端口是否被占用
+		// 如果端口已经在监听，则重复利用
+		if _, exists := listeners.Load(port); exists {
+			log.Printf("Port %d is already listening\n", port)
+			continue
+		}
+
 		listener = _listen(port)
 		if listener == nil {
 			// 监听失败
@@ -88,7 +91,7 @@ func _buildListener(conn net.Conn, protocol Protocol, cfg config.ServerConfig) b
 			return false
 		}
 		// 存放监听映射信息
-		listeners.Store(key, listener)
+		listeners.Store(port, listener)
 	}
 
 	// 发送鉴权结果到客户端
@@ -127,7 +130,7 @@ func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 		listener = _loadListener(conn, protocol)
 	case protocolTypeAuth:
 		_buildListener(conn, protocol, cfg)
-		closeConn(conn)
+		// 注意不能关闭连接
 		return
 	default:
 		// 非法类型
@@ -138,9 +141,6 @@ func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 	proxyConn := _accept(listener)
 	if conn != nil && proxyConn != nil {
 		forward(conn, proxyConn)
-	} else {
-		closeConn(conn)
-		closeConn(proxyConn)
 	}
 }
 

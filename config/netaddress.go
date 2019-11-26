@@ -63,7 +63,7 @@ func checkPort(port int) bool {
 }
 
 // 从地址中抽取出端口
-func extractPort(address []NetAddress) []int {
+func extractPorts(address []NetAddress) []int {
 	accessPort := make([]int, len(address))
 	for i, addr := range address {
 		accessPort[i] = addr.Port

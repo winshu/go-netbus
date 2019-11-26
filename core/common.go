@@ -14,8 +14,7 @@ const (
 
 // 连接数据复制
 func connCopy(source, target net.Conn, wg *sync.WaitGroup) {
-	_, err := io.Copy(source, target)
-	if err != nil {
+	if _, err := io.Copy(source, target); err != nil {
 		//log.Println("Connection interrupted")
 	}
 	_ = source.Close()
