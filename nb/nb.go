@@ -8,10 +8,11 @@ import (
 	"time"
 )
 
-// 网上的一个案例
+// 网上的一个案例 https://github.com/cw1997/NATBypass
 
 const timeout = 5
 
+// 端口对接，服务层
 func Port2Port(port1 string, port2 string) {
 	listen1 := listen("0.0.0.0:" + port1)
 	listen2 := listen("0.0.0.0:" + port2)
@@ -28,6 +29,7 @@ func Port2Port(port1 string, port2 string) {
 	}
 }
 
+// 端口到主机，用于转发
 func Port2Host(allowPort string, targetAddress string) {
 	server := listen("0.0.0.0:" + allowPort)
 	for {
@@ -52,6 +54,7 @@ func Port2Host(allowPort string, targetAddress string) {
 	}
 }
 
+// 网络对接，用于客户端
 func Host2Host(address1, address2 string) {
 	for {
 		log.Println("[+]", "try to connect host:["+address1+"] and ["+address2+"]")
