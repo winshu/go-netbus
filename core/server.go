@@ -2,11 +2,11 @@ package core
 
 import (
 	"../config"
+	"../util"
 	"fmt"
 	"log"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -35,66 +35,122 @@ func _accept(listener net.Listener) net.Conn {
 }
 
 // 所有访问监听器
-// key:   NetAddress.String()
+// key:   token
 // value: net.Listener
 var listeners sync.Map
 
-// 根据地址获取已建立的监听，如果不存在则创建监听
-func _loadOrStore(originalAddr config.NetAddress, portMode int) net.Listener {
-	listener, exists := listeners.Load(originalAddr.String())
-	if !exists {
-		proxyPort := config.NewProxyPort(portMode, originalAddr.Port)
-		listener = _listen(proxyPort)
-		listeners.Store(originalAddr.String(), listener)
+// 从 listeners 中加载监听
+func _loadListener(conn net.Conn, protocol Protocol) net.Listener {
+	listener, exists := listeners.Load(protocol.Ports[0])
+	result := protocolResultFail
+	if exists {
+		result = protocolResultSuccess
 	}
+	// 发送处理结果
+	sendProtocol(conn, Protocol{
+		Result: result,
+		Type:   protocolTypeAuth,
+		Ports:  protocol.Ports,
+		Token:  protocol.Token,
+	})
 	return listener.(net.Listener)
 }
 
-func _buildAccessAddress(conn net.Conn, listener net.Listener) config.NetAddress {
-	serverAddress := conn.RemoteAddr().String()
-	ipIndex := strings.LastIndex(serverAddress, ":")
+// 创建监听
+func _buildListener(conn net.Conn, protocol Protocol, cfg config.ServerConfig) bool {
+	// 创建访问端口
+	accessPort, ok := _makeAccessPort(protocol, cfg)
+	if !ok { // 失败，发送失败结果到客户端
+		sendProtocol(conn, Protocol{
+			Result: protocolResultFail,
+			Type:   protocolTypeAuth,
+			Ports:  protocol.Ports,
+			Token:  protocol.Token,
+		})
+		return false
+	}
 
-	listenerAddress := listener.Addr().String()
-	portIndex := strings.LastIndex(listenerAddress, ":")
-	port, _ := strconv.Atoi(listenerAddress[portIndex+1:])
+	// 创建监听失败
+	var listener net.Listener
+	for _, port := range accessPort {
+		// 如果端口已经在监听，则重复利用
+		if _, exists := listeners.Load(port); exists {
+			log.Printf("Port %d is already listening\n", port)
+			continue
+		}
 
-	return config.NetAddress{IP: serverAddress[:ipIndex], Port: port}
+		listener = _listen(port)
+		if listener == nil {
+			// 监听失败
+			sendProtocol(conn, Protocol{
+				Result: protocolResultFail,
+				Type:   protocolTypeAuth,
+				Ports:  accessPort,
+				Token:  protocol.Token,
+			})
+			return false
+		}
+		// 存放监听映射信息
+		listeners.Store(port, listener)
+	}
+
+	// 发送鉴权结果到客户端
+	return sendProtocol(conn, Protocol{
+		Result: protocolResultSuccess,
+		Type:   protocolTypeAuth,
+		Ports:  accessPort,
+		Token:  protocol.Token,
+	})
+}
+
+// 创建访问端口
+func _makeAccessPort(protocol Protocol, cfg config.ServerConfig) ([]int, bool) {
+	if len(protocol.Ports) == 0 {
+		return nil, false
+	}
+	if strings.HasPrefix(protocol.Token, cfg.CustomPortKey) {
+		// 允许自定义端口、同名端口
+		return protocol.Ports, true
+	} else if strings.HasPrefix(protocol.Token, cfg.RandomPortKey) {
+		// 允许随机端口
+		randPorts := util.RandPorts(len(protocol.Ports))
+		return randPorts, true
+	}
+	// 无权限访问
+	return nil, false
 }
 
 // 处理连接
 func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
-	// 接收消息头，并检查端口是否可代理
-	address, ok := receiveHeader(conn)
-	if !ok || !config.CheckProxyPort(cfg.PortMode, address.Port) {
-		closeConn(conn)
-		return
-	}
-	// 取出监听
-	// TODO FIX 存在监听无法被 close 的问题
-	listener := _loadOrStore(address, cfg.PortMode)
-	// 回写访问地址
-	header := _buildAccessAddress(conn, listener)
-	if !sendHeader(conn, header) {
-		closeConn(conn)
-		return
-	}
+	var listener net.Listener
+	protocol := receiveProtocol(conn)
 
+	switch protocol.Type {
+	case protocolTypeNormal:
+		listener = _loadListener(conn, protocol)
+	case protocolTypeAuth:
+		_buildListener(conn, protocol, cfg)
+		// 注意不能关闭连接
+		return
+	default:
+		// 非法类型
+		closeConn(conn)
+		return
+	}
 	// 代理连接
 	proxyConn := _accept(listener)
 	if conn != nil && proxyConn != nil {
 		forward(conn, proxyConn)
-	} else {
-		closeConn(conn)
-		closeConn(proxyConn)
 	}
 }
 
+// 入口
 func Server(cfg config.ServerConfig) {
 	serverListener := _listen(cfg.Port)
 	if serverListener == nil {
 		os.Exit(1)
 	}
-	// TODO 需要记录已使用的端口
+
 	for {
 		conn := _accept(serverListener)
 		if conn != nil {

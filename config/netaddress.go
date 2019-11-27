@@ -8,11 +8,13 @@ import (
 	"strings"
 )
 
+// 网络地址
 type NetAddress struct {
 	IP   string
 	Port int
 }
 
+// 转字符串
 func (t NetAddress) String() string {
 	return fmt.Sprintf("%s:%d", t.IP, t.Port)
 }
@@ -32,7 +34,7 @@ func ParseNetAddresses(addresses string) ([]NetAddress, bool) {
 	return result, true
 }
 
-// 解析地址
+// 解析单个地址
 func ParseNetAddress(address string) (NetAddress, bool) {
 	arr := strings.Split(strings.TrimSpace(address), ":")
 	if len(arr) != 2 {
@@ -52,11 +54,19 @@ func ParseNetAddress(address string) (NetAddress, bool) {
 		log.Println("Fail to parse address port")
 		return NetAddress{}, false
 	}
-
 	return NetAddress{ip, port}, true
 }
 
 // 检查端口是否合法
 func checkPort(port int) bool {
 	return port > 0 && port <= 65535
+}
+
+// 从地址中抽取出端口
+func extractPorts(address []NetAddress) []int {
+	accessPort := make([]int, len(address))
+	for i, addr := range address {
+		accessPort[i] = addr.Port
+	}
+	return accessPort
 }
