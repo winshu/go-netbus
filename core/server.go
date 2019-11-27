@@ -56,6 +56,7 @@ func _loadListener(conn net.Conn, protocol Protocol) net.Listener {
 	if listener == nil {
 		return nil
 	}
+	// listener 为空时，不能强转，go 语法
 	return listener.(net.Listener)
 }
 
