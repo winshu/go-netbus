@@ -87,7 +87,6 @@ func sendProtocol(conn net.Conn, protocol Protocol) bool {
 
 	if _, err := conn.Write(buffer.Bytes()); err != nil {
 		log.Printf("Send protocol failed. [%s] %s\n", protocol.String(), err.Error())
-		_ = conn.Close()
 		return false
 	}
 	//log.Println("Send protocol", protocol.String())
@@ -113,6 +112,6 @@ func receiveProtocol(conn net.Conn) Protocol {
 	}
 	// 解析消息
 	body := strings.TrimSpace(string(buffer))
-	//log.Println("----------> Receive protocol", body)
+	log.Println("----------> Receive protocol", body)
 	return _parseProtocol(body)
 }

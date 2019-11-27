@@ -42,18 +42,7 @@ var listeners sync.Map
 // 从 listeners 中加载监听
 func _loadListener(conn net.Conn, protocol Protocol) net.Listener {
 	listener, exists := listeners.Load(protocol.Ports[0])
-	result := protocolResultFail
-	if exists {
-		result = protocolResultSuccess
-	}
-	// 发送处理结果
-	sendProtocol(conn, Protocol{
-		Result: result,
-		Type:   protocolTypeAuth,
-		Ports:  protocol.Ports,
-		Token:  protocol.Token,
-	})
-	if listener == nil {
+	if !exists {
 		return nil
 	}
 	// listener 为空时，不能强转，go 语法
@@ -136,19 +125,38 @@ func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 		}
 	case protocolTypeAuth:
 		_buildListener(conn, protocol, cfg)
-		// 注意不能关闭连接
+		// 鉴权成功需要返回
 		return
 	default:
 		// 非法类型
-		log.Println("Forbidden type", protocol)
+		log.Println("Forbidden protocol type", protocol)
 		closeConn(conn)
 		return
 	}
-	// 代理连接
-	proxyConn := _accept(listener)
-	if conn != nil && proxyConn != nil {
+	// Web 连接方式
+	if proxyConn := _accept(listener); proxyConn != nil {
 		forward(conn, proxyConn)
 	}
+
+	// TCP 连接方式
+	// 用管道处理多次短连接问题
+	//proxyConnChan := make(chan net.Conn, 32)
+	//go func() {
+	//	for {
+	//		log.Println("forward------------------------------")
+	//		if proxyConn := <-proxyConnChan; proxyConn != nil {
+	//			forward(conn, <-proxyConnChan)
+	//		}
+	//	}
+	//}()
+	//go func() {
+	//	for {
+	//		log.Println("accept------------------------------")
+	//		if proxyConn := _accept(listener); proxyConn != nil {
+	//			proxyConnChan <- proxyConn
+	//		}
+	//	}
+	//}()
 }
 
 // 入口

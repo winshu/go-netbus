@@ -38,7 +38,6 @@ func forward(conn1, conn2 net.Conn) {
 // 关闭连接
 func closeConn(conn net.Conn) {
 	if conn != nil {
-		log.Println("close conn...........................", conn.LocalAddr().String())
 		_ = conn.Close()
 	}
 }

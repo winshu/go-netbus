@@ -55,7 +55,7 @@ func _parseClientConfig(args []string) ClientConfig {
 	}
 	// 如果未配置访问端口，则访问端口与内网服务端口相同
 	if len(config.AccessPort) == 0 {
-		config.AccessPort = extractPorts(config.LocalAddr)
+		config.AccessPort = ExtractPorts(config.LocalAddr)
 	}
 	// 如果访问端口与内网服务地址不一样，则配置检查不通过
 	if len(config.AccessPort) != len(config.LocalAddr) {
