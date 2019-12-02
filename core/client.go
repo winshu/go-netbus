@@ -13,10 +13,9 @@ import (
 func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*最大重拨次数*/) net.Conn {
 	redialTimes := 0
 	for {
-		log.Println("Dial to", targetAddr)
 		conn, err := net.Dial("tcp", targetAddr.String())
 		if err == nil {
-			log.Println("Dial success ->", targetAddr)
+			//log.Println("Dial success ->", targetAddr)
 			return conn
 		}
 
@@ -90,6 +89,7 @@ func Client(cfg config.ClientConfig) {
 	if protocol = _requestAuth(token, cfg); protocol.Result != protocolResultSuccess {
 		log.Fatalln("Fail to auth")
 	}
+	log.Println("Auth success", protocol)
 
 	// 连接
 	for i, local := range cfg.LocalAddr {

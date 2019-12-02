@@ -30,7 +30,7 @@ func _accept(listener net.Listener) net.Conn {
 		log.Println("Accept connect failed ->", conn.RemoteAddr(), err.Error())
 		return nil
 	}
-	log.Println("Accept a new client ->", conn.RemoteAddr())
+	//log.Println("Accept a new client ->", conn.RemoteAddr())
 	return conn
 }
 
@@ -40,7 +40,7 @@ func _accept(listener net.Listener) net.Conn {
 var listeners sync.Map
 
 // 从 listeners 中加载监听
-func _loadListener(conn net.Conn, protocol Protocol) net.Listener {
+func _loadListener(protocol Protocol) net.Listener {
 	listener, exists := listeners.Load(protocol.Ports[0])
 	if !exists {
 		return nil
@@ -66,9 +66,10 @@ func _buildListener(conn net.Conn, protocol Protocol, cfg config.ServerConfig) b
 	// 创建监听失败
 	var listener net.Listener
 	for _, port := range accessPort {
-		// 如果端口已经在监听，则重复利用
-		if _, exists := listeners.Load(port); exists {
+		// 如果端口已经在监听，则重复使用
+		if listener, exists := listeners.Load(port); exists {
 			log.Printf("Port %d is already listening\n", port)
+			_ = (listener.(net.Listener)).Close()
 			continue
 		}
 
@@ -115,16 +116,20 @@ func _makeAccessPort(protocol Protocol, cfg config.ServerConfig) ([]int, bool) {
 
 // 处理连接
 func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
-	var listener net.Listener
+	var serverListener net.Listener
 	protocol := receiveProtocol(conn)
+	log.Println("----------> Receive protocol", protocol)
 
 	switch protocol.Type {
 	case protocolTypeNormal:
-		if listener = _loadListener(conn, protocol); listener == nil {
+		if serverListener = _loadListener(protocol); serverListener == nil {
+			// 获取监听失败
 			return
 		}
 	case protocolTypeAuth:
-		_buildListener(conn, protocol, cfg)
+		if !_buildListener(conn, protocol, cfg) {
+			log.Println("Fail to auth", protocol)
+		}
 		// 鉴权成功需要返回
 		return
 	default:
@@ -133,43 +138,27 @@ func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
 		closeConn(conn)
 		return
 	}
-	// Web 连接方式
-	if proxyConn := _accept(listener); proxyConn != nil {
-		forward(conn, proxyConn)
+	// 等待访问端连接
+	if serverConn := _accept(serverListener); serverConn != nil {
+		log.Println("Accept a new server ->", serverConn.RemoteAddr(), serverConn.LocalAddr())
+		forward(conn, serverConn)
 	}
-
-	// TCP 连接方式
-	// 用管道处理多次短连接问题
-	//proxyConnChan := make(chan net.Conn, 32)
-	//go func() {
-	//	for {
-	//		log.Println("forward------------------------------")
-	//		if proxyConn := <-proxyConnChan; proxyConn != nil {
-	//			forward(conn, <-proxyConnChan)
-	//		}
-	//	}
-	//}()
-	//go func() {
-	//	for {
-	//		log.Println("accept------------------------------")
-	//		if proxyConn := _accept(listener); proxyConn != nil {
-	//			proxyConnChan <- proxyConn
-	//		}
-	//	}
-	//}()
 }
 
 // 入口
 func Server(cfg config.ServerConfig) {
-	serverListener := _listen(cfg.Port)
-	if serverListener == nil {
+	// 监听桥接端口
+	bridgeListener := _listen(cfg.Port)
+	if bridgeListener == nil {
 		os.Exit(1)
 	}
 
 	for {
-		conn := _accept(serverListener)
-		if conn != nil {
-			go _handleServerConn(conn, cfg)
+		// 受理来自客户端的请求
+		bridgeConn := _accept(bridgeListener)
+		if bridgeConn != nil {
+			log.Println("Accept a new client ->", bridgeConn.RemoteAddr(), bridgeConn.LocalAddr())
+			go _handleServerConn(bridgeConn, cfg)
 		}
 	}
 }

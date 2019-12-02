@@ -3,7 +3,12 @@ package util
 import (
 	"bytes"
 	"math/rand"
+	"time"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 // 随机生成前缀为 prefix、总长度为 length 的 Token，长度不足时，追加随机字符
 func RandToken(prefix string, length int) string {

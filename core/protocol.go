@@ -112,6 +112,6 @@ func receiveProtocol(conn net.Conn) Protocol {
 	}
 	// 解析消息
 	body := strings.TrimSpace(string(buffer))
-	log.Println("----------> Receive protocol", body)
+	//log.Println("----------> Receive protocol", body)
 	return _parseProtocol(body)
 }
