@@ -3,7 +3,6 @@ package test
 import (
 	"../config"
 	"../core"
-	"../util"
 	"fmt"
 	"log"
 	"testing"
@@ -18,16 +17,15 @@ func init() {
 // netbus
 func TestServer(t *testing.T) {
 	cfg := config.ServerConfig{
-		Port:          6666,
-		CustomPortKey: "custom",
-		RandomPortKey: "random",
+		Port: 6666,
+		Key:  "winshu",
 	}
 	core.Server(cfg)
 }
 
 func TestClient(t *testing.T) {
 	cfg := config.ClientConfig{
-		Key: "custom",
+		Key: "winshu",
 		ServerAddr: config.NetAddress{
 			IP: "127.0.0.1", Port: 6666,
 		},
@@ -41,5 +39,8 @@ func TestClient(t *testing.T) {
 }
 
 func TestHeader(t *testing.T) {
-	fmt.Println(util.RandToken("abcde", 10))
+	arr := []string{"aa", "bb", "cc"}
+	for i := range arr {
+		fmt.Println(i)
+	}
 }

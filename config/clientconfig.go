@@ -98,6 +98,5 @@ func InitClientConfig(args []string) ClientConfig {
 	} else {
 		clientConfig = _parseClientConfig(args)
 	}
-	log.Println("Init client config from args finished", clientConfig)
 	return clientConfig
 }

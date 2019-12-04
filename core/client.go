@@ -2,8 +2,6 @@ package core
 
 import (
 	"../config"
-	"../util"
-	"fmt"
 	"log"
 	"net"
 	"time"
@@ -15,104 +13,70 @@ func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*�
 	for {
 		conn, err := net.Dial("tcp", targetAddr.String())
 		if err == nil {
-			//log.Println("Dial success ->", targetAddr)
+			log.Printf("Dial to [%s] success.\n", targetAddr)
 			return conn
 		}
 
 		redialTimes++
 		if maxRedialTimes < 0 || redialTimes < maxRedialTimes {
 			// 重连模式，每5秒一次
-			log.Printf("Dial failed, retry(%d) after %d seconeds.", redialTimes, retryIntervalTime)
+			log.Printf("Dial to [%s] failed, retry(%d) after %d seconeds.", targetAddr.String(), redialTimes, retryIntervalTime)
 			time.Sleep(retryIntervalTime * time.Second)
 		} else {
-			log.Println("Dial failed ->", err.Error())
+			log.Printf("Dial to [%s] failed. %s\n", targetAddr.String(), err.Error())
 			return nil
 		}
 	}
 }
 
-// 鉴权
-func _requestAuth(token string, cfg config.ClientConfig) (resp Protocol, ok bool) {
-	serverConn := _dial(cfg.ServerAddr, cfg.MaxRedialTimes)
-	defer closeConn(serverConn)
-	if serverConn == nil {
-		return
+// 请求连接
+func _requestConn(serverConn net.Conn, key string, accessPort int) (Protocol, bool) {
+	reqProtocol := Protocol{
+		Port: accessPort,
+		Key:  key,
 	}
-
-	// 验证身份
-	// 如果没有配置固定端口
-	ports := cfg.AccessPort
-	if len(ports) == 0 {
-		ports = config.ExtractPorts(cfg.LocalAddr)
-	}
-
-	req := Protocol{
-		Result: protocolResultSuccess,
-		Type:   protocolTypeAuth, // 鉴权
-		Ports:  ports,
-		Token:  token,
-	}
-	if !sendProtocol(serverConn, req) {
-		return
+	if !sendProtocol(serverConn, reqProtocol) {
+		return Protocol{Result: protocolResultFailToSend}, false
 	}
 	return receiveProtocol(serverConn)
 }
 
-// 请求连接
-func _requestConn(serverConn net.Conn, token string, accessPort int) bool {
-	tokenX := fmt.Sprintf("%s%d", token, accessPort)
-	reqProtocol := Protocol{
-		Result: protocolResultSuccess,
-		Type:   protocolTypeConn,
-		Ports:  []int{accessPort},
-		Token:  tokenX,
-	}
-	if !sendProtocol(serverConn, reqProtocol) {
-		return false
-	}
-	_, ok := receiveProtocol(serverConn)
-	return ok
-}
-
 // 处理客户端连接
-func _handleClientConn(token string, local config.NetAddress, server config.NetAddress, accessPort int, maxRedialTimes int) {
+func _handleClientConn(cfg config.ClientConfig, index int) {
+	server := cfg.ServerAddr
+	local := cfg.LocalAddr[index]
+	accessPort := cfg.AccessPort[index]
+
 	var conn, serverConn net.Conn
 	for {
 		// 代理服务拨号，失败则关闭客户端
-		if serverConn = _dial(server, maxRedialTimes); serverConn == nil {
-			break
-		}
-		// 发送建立连接请求
-		if !_requestConn(serverConn, token, accessPort) {
+		if serverConn = _dial(server, cfg.MaxRedialTimes); serverConn == nil {
 			continue
 		}
-		// 接收到请求，则拨号连接内网服务
-		// 如果内网服务不通，尝试重连后放弃
-		if conn = _dial(local, maxRedialTimes); conn == nil {
+		// 发送连接请求
+		resp, ok := _requestConn(serverConn, cfg.Key, accessPort)
+		if !ok || resp.Result != protocolResultSuccess {
+			log.Println("Fail to request conn.", resp.String())
 			closeConn(serverConn)
 			break
 		}
-		log.Printf("Proxy address [%s] --> [%s:%d]\n", local, server.IP, accessPort)
+		log.Printf("Proxy address [%s] --> [%s:%d]\n", local, server.IP, resp.Port)
+		// 如果内网服务不通，尝试重连后放弃
+		if conn = _dial(local, cfg.MaxRedialTimes); conn == nil {
+			closeConn(serverConn)
+			continue
+		}
 		forward(conn, serverConn)
 	}
 }
 
 // 入口
 func Client(cfg config.ClientConfig) {
-	// token 随机生成
-	token := util.RandToken(cfg.Key, protocolTokenLength)
+	log.Println("Load config", cfg)
 
-	//鉴权
-	protocol, ok := _requestAuth(token, cfg)
-	if !ok {
-		log.Fatalln("Fail to auth")
-	}
-	log.Println("Auth success", protocol)
-
-	// 连接
-	for i, local := range cfg.LocalAddr {
-		accessPort := protocol.Ports[i]
-		go _handleClientConn(token, local, cfg.ServerAddr, accessPort, cfg.MaxRedialTimes)
+	// 遍历所有端口
+	for index := range cfg.LocalAddr {
+		go _handleClientConn(cfg, index)
 	}
 	select {}
 }

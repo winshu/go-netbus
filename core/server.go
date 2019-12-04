@@ -2,12 +2,10 @@ package core
 
 import (
 	"../config"
-	"../util"
 	"fmt"
 	"log"
 	"net"
 	"os"
-	"strings"
 	"sync"
 )
 
@@ -35,108 +33,61 @@ func _accept(listener net.Listener) net.Conn {
 }
 
 // 所有访问监听器
-// key:   token
+// key:   accessPort
 // value: net.Listener
 var listeners sync.Map
 
-// 从 listeners 中加载监听
-func _loadListener(protocol Protocol) net.Listener {
-	listener, exists := listeners.Load(protocol.Ports[0])
-	if !exists {
+// 创建访问端口
+func _auth(req Protocol, cfg config.ServerConfig) (port int, ok bool) {
+	if len(req.Key) < protocolKeyMinLength || len(req.Key) > protocolKeyMaxLength {
+		return
+	}
+	if req.Key == cfg.Key {
+		return req.Port, true
+	}
+	return
+}
+
+func _fetchListener(accessPort int, cfg config.ServerConfig) net.Listener {
+	// 获取监听
+	listener, exists := listeners.Load(accessPort)
+	if exists {
+		log.Printf("Port [%d] is already listening\n", accessPort)
+		return listener.(net.Listener)
+	}
+
+	// 若不存在，则创建监听
+	listener = _listen(accessPort)
+	if listener == nil {
 		return nil
 	}
-	// listener 为空时，不能强转，go 语法
+	listeners.Store(accessPort, listener)
 	return listener.(net.Listener)
-}
-
-// 创建监听
-func _initAccessListener(conn net.Conn, protocol Protocol, cfg config.ServerConfig) bool {
-	// 创建访问端口
-	accessPort, ok := _makeAccessPort(protocol, cfg)
-	if !ok { // 失败，发送失败结果到客户端
-		sendProtocol(conn, Protocol{
-			Result: protocolResultFail,
-			Type:   protocolTypeAuth,
-			Ports:  protocol.Ports,
-			Token:  protocol.Token,
-		})
-		return false
-	}
-
-	// 创建监听失败
-	var listener net.Listener
-	for _, port := range accessPort {
-		// 如果端口已经在监听，则重复使用
-		if _, exists := listeners.Load(port); exists {
-			log.Printf("Port %d is already listening\n", port)
-			continue
-		}
-
-		listener = _listen(port)
-		if listener == nil {
-			// 监听失败
-			sendProtocol(conn, Protocol{
-				Result: protocolResultFail,
-				Type:   protocolTypeAuth,
-				Ports:  accessPort,
-				Token:  protocol.Token,
-			})
-			return false
-		}
-		// 存放监听映射信息
-		listeners.Store(port, listener)
-	}
-
-	// 发送鉴权结果到客户端
-	return sendProtocol(conn, Protocol{
-		Result: protocolResultSuccess,
-		Type:   protocolTypeAuth,
-		Ports:  accessPort,
-		Token:  protocol.Token,
-	})
-}
-
-// 创建访问端口
-func _makeAccessPort(protocol Protocol, cfg config.ServerConfig) ([]int, bool) {
-	if len(protocol.Ports) == 0 {
-		return nil, false
-	}
-	if strings.HasPrefix(protocol.Token, cfg.CustomPortKey) {
-		// 允许自定义端口、同名端口
-		return protocol.Ports, true
-	} else if strings.HasPrefix(protocol.Token, cfg.RandomPortKey) {
-		// 允许随机端口
-		randPorts := util.RandPorts(len(protocol.Ports))
-		return randPorts, true
-	}
-	// 无权限访问
-	return nil, false
 }
 
 // 处理连接
 func _handleServerConn(bridgeConn net.Conn, cfg config.ServerConfig) {
-	var serverListener net.Listener
-	protocol, ok := receiveProtocol(bridgeConn)
+	// 接收协议消息
+	req, ok := receiveProtocol(bridgeConn)
 	if !ok {
-		return
-	}
-	log.Println("----------> Receive protocol", protocol)
-	switch protocol.Type {
-	case protocolTypeConn:
-		if serverListener = _loadListener(protocol); serverListener == nil {
-			// 获取监听失败
-			return
-		}
-	case protocolTypeAuth:
-		if !_initAccessListener(bridgeConn, protocol, cfg) {
-			log.Println("Fail to auth", protocol)
-		}
-		// 鉴权成功需要返回
+		sendProtocol(bridgeConn, req.NewResult(protocolResultFailToReceive))
 		closeConn(bridgeConn)
 		return
-	default:
-		// 非法类型
-		log.Println("Forbidden protocol type", protocol)
+	}
+	// 检查权限
+	accessPort, ok := _auth(req, cfg)
+	if !ok {
+		log.Println("Unauthorized access", req.String())
+		sendProtocol(bridgeConn, req.NewResult(protocolResultFailToAuth))
+		closeConn(bridgeConn)
+		return
+	}
+
+	// 建立连接
+	serverListener := _fetchListener(accessPort, cfg)
+	if serverListener == nil {
+		log.Println("Fail to fail server listener", req.String())
+		sendProtocol(bridgeConn, req.NewResult(protocolResultFailToListen))
 		closeConn(bridgeConn)
 		return
 	}
@@ -147,20 +98,17 @@ func _handleServerConn(bridgeConn net.Conn, cfg config.ServerConfig) {
 		closeConn(serverConn)
 		return
 	}
-	log.Println("Accept a new server ->", serverConn.RemoteAddr(), serverConn.LocalAddr())
+	log.Println("Accept a new server ->", req.String())
 	// 通知客户端，开始通讯
-	if sendProtocol(bridgeConn, Protocol{
-		Result: protocolResultSuccess,
-		Type:   protocolTypeConn,
-		Ports:  protocol.Ports,
-		Token:  protocol.Token,
-	}) {
+	if sendProtocol(bridgeConn, Protocol{Port: accessPort, Key: req.Key}) {
 		forward(bridgeConn, serverConn)
 	}
 }
 
 // 入口
 func Server(cfg config.ServerConfig) {
+	log.Println("Load config", cfg)
+
 	// 监听桥接端口
 	bridgeListener := _listen(cfg.Port)
 	if bridgeListener == nil {
