@@ -18,8 +18,8 @@ const (
 	protocolResultSuccess = 1 // 成功
 
 	// 协议-消息类型
-	protocolTypeNormal = 0 // 正常，默认值
-	protocolTypeAuth   = 1 // 鉴权
+	protocolTypeAuth = 1 // 鉴权
+	protocolTypeConn = 2 // 连接
 
 	// Token 长度
 	protocolTokenLength = 16 // Token 长度
@@ -32,7 +32,7 @@ const (
 // 协议
 type Protocol struct {
 	Result int    // 结果：0 失败，1 成功
-	Type   int    // 消息类型：0 正常，1 鉴权
+	Type   int    // 消息类型：0 正常，1 鉴权，2 建立连接
 	Ports  []int  // 端口列表
 	Token  string // 令牌
 }
@@ -44,25 +44,25 @@ func (h *Protocol) String() string {
 }
 
 // 解析协议
-func _parseProtocol(body string) Protocol {
+func _parseProtocol(body string) (result Protocol, ok bool) {
 	// 拆解字符
 	arr := strings.Split(body, "|")
 	if len(arr) != protocolLength {
-		return Protocol{}
+		return
 	}
 	// 前两个字段
 	params, err := util.AtoInt(arr[0:2])
 	if err != nil {
-		return Protocol{}
+		return
 	}
 	// 第三个字段
 	var ports []int
 	if len(arr[2]) > 0 {
 		if ports, err = util.AtoInt2(arr[2]); err != nil {
-			return Protocol{}
+			return
 		}
 	} else {
-		return Protocol{}
+		return
 	}
 
 	return Protocol{
@@ -70,7 +70,7 @@ func _parseProtocol(body string) Protocol {
 		Type:   params[1],
 		Ports:  ports,
 		Token:  arr[3],
-	}
+	}, true
 }
 
 // 发送协议
@@ -95,23 +95,24 @@ func sendProtocol(conn net.Conn, protocol Protocol) bool {
 
 // 接收协议
 // 第一个字节为协议长度
-func receiveProtocol(conn net.Conn) Protocol {
+func receiveProtocol(conn net.Conn) (resp Protocol, ok bool) {
 	var err error
 
 	// 读取协议长度
 	buffer := make([]byte, 1)
 	if _, err := conn.Read(buffer); err != nil {
 		log.Println("Parse protocol length failed.", err.Error())
-		return Protocol{}
+		return
 	}
 	// 读取协议内容
 	buffer = make([]byte, buffer[0])
 	if _, err = conn.Read(buffer); err != nil {
 		log.Println("Parse protocol body failed.", err.Error())
-		return Protocol{}
+		return
 	}
 	// 解析消息
 	body := strings.TrimSpace(string(buffer))
 	//log.Println("----------> Receive protocol", body)
+
 	return _parseProtocol(body)
 }

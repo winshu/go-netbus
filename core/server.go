@@ -27,7 +27,7 @@ func _listen(port int) net.Listener {
 func _accept(listener net.Listener) net.Conn {
 	conn, err := listener.Accept()
 	if err != nil {
-		log.Println("Accept connect failed ->", conn.RemoteAddr(), err.Error())
+		log.Println("Accept connect failed ->", err.Error())
 		return nil
 	}
 	//log.Println("Accept a new client ->", conn.RemoteAddr())
@@ -50,7 +50,7 @@ func _loadListener(protocol Protocol) net.Listener {
 }
 
 // 创建监听
-func _buildListener(conn net.Conn, protocol Protocol, cfg config.ServerConfig) bool {
+func _initAccessListener(conn net.Conn, protocol Protocol, cfg config.ServerConfig) bool {
 	// 创建访问端口
 	accessPort, ok := _makeAccessPort(protocol, cfg)
 	if !ok { // 失败，发送失败结果到客户端
@@ -67,9 +67,8 @@ func _buildListener(conn net.Conn, protocol Protocol, cfg config.ServerConfig) b
 	var listener net.Listener
 	for _, port := range accessPort {
 		// 如果端口已经在监听，则重复使用
-		if listener, exists := listeners.Load(port); exists {
+		if _, exists := listeners.Load(port); exists {
 			log.Printf("Port %d is already listening\n", port)
-			_ = (listener.(net.Listener)).Close()
 			continue
 		}
 
@@ -115,33 +114,48 @@ func _makeAccessPort(protocol Protocol, cfg config.ServerConfig) ([]int, bool) {
 }
 
 // 处理连接
-func _handleServerConn(conn net.Conn, cfg config.ServerConfig) {
+func _handleServerConn(bridgeConn net.Conn, cfg config.ServerConfig) {
 	var serverListener net.Listener
-	protocol := receiveProtocol(conn)
+	protocol, ok := receiveProtocol(bridgeConn)
+	if !ok {
+		return
+	}
 	log.Println("----------> Receive protocol", protocol)
-
 	switch protocol.Type {
-	case protocolTypeNormal:
+	case protocolTypeConn:
 		if serverListener = _loadListener(protocol); serverListener == nil {
 			// 获取监听失败
 			return
 		}
 	case protocolTypeAuth:
-		if !_buildListener(conn, protocol, cfg) {
+		if !_initAccessListener(bridgeConn, protocol, cfg) {
 			log.Println("Fail to auth", protocol)
 		}
 		// 鉴权成功需要返回
+		closeConn(bridgeConn)
 		return
 	default:
 		// 非法类型
 		log.Println("Forbidden protocol type", protocol)
-		closeConn(conn)
+		closeConn(bridgeConn)
 		return
 	}
-	// 等待访问端连接
-	if serverConn := _accept(serverListener); serverConn != nil {
-		log.Println("Accept a new server ->", serverConn.RemoteAddr(), serverConn.LocalAddr())
-		forward(conn, serverConn)
+
+	serverConn := _accept(serverListener)
+	if serverConn == nil {
+		closeConn(bridgeConn)
+		closeConn(serverConn)
+		return
+	}
+	log.Println("Accept a new server ->", serverConn.RemoteAddr(), serverConn.LocalAddr())
+	// 通知客户端，开始通讯
+	if sendProtocol(bridgeConn, Protocol{
+		Result: protocolResultSuccess,
+		Type:   protocolTypeConn,
+		Ports:  protocol.Ports,
+		Token:  protocol.Token,
+	}) {
+		forward(bridgeConn, serverConn)
 	}
 }
 
