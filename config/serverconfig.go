@@ -20,13 +20,14 @@ func _parseServerConfig(args []string) ServerConfig {
 	if len(args) < 2 {
 		log.Fatalln("More args in need")
 	}
+	// 0 key
+	key := strings.TrimSpace(args[0])
+
 	// 1 port
-	port, err := strconv.Atoi(strings.TrimSpace(args[0]))
+	port, err := strconv.Atoi(strings.TrimSpace(args[1]))
 	if err != nil || !checkPort(port) {
 		log.Fatalln("Fail to parse args.", args)
 	}
-	// 2 key
-	key := strings.TrimSpace(args[1])
 
 	return ServerConfig{
 		Port: port,
@@ -45,8 +46,8 @@ func _loadServerConfig() ServerConfig {
 	}
 
 	args := make([]string, 2)
-	args[0] = server("port").String()
-	args[1] = server("key").String()
+	args[0] = server("key").String()
+	args[1] = server("port").String()
 
 	return _parseServerConfig(args)
 }
