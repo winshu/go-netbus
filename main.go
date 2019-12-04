@@ -12,8 +12,8 @@ import (
 
 func printWelcome(args []string) {
 	fmt.Println("+----------------------------------------------------------------+")
-	fmt.Println("| Welcome to use NetBus version 1.0.0                            |")
-	fmt.Println("| Code by winshu at 2019/11/19                                   |")
+	fmt.Println("| Welcome to use NetBus version 1.0.2                            |")
+	fmt.Println("| Code by winshu at 2019/12/05                                   |")
 	fmt.Println("| If you have some problem when you use the tool,                |")
 	fmt.Println("| Please submit issue at : https://gitee.com/winshu/go-netbus    |")
 	fmt.Println("+----------------------------------------------------------------+")
@@ -26,8 +26,9 @@ func printWelcome(args []string) {
 func printHelp() {
 	fmt.Println(`A: "-server" load "config.ini" and start as server`)
 	fmt.Println(`   "-client " load "config.ini" and start as client`)
-	fmt.Println(`B: "-server <port>" start as server, and listening at port x', e.g. -server 6666`)
-	fmt.Println(`   "-client <server:port> <local:port>" start as client, e.g. -client 123.54.23.67:6666 127.0.0.1:3306`)
+	fmt.Println(`B: "-server <key> <port>" start as server, and listening at port x', e.g. -server 6666`)
+	fmt.Println(`   "-client <key> <server:port> <local:port> [access-port] [max-redial-times]" start as client,`)
+	fmt.Println(`   "e.g. -client winshu 123.54.23.67:6666 127.0.0.1:3306`)
 	fmt.Println(`more details please read "README.md"`)
 }
 

@@ -9,32 +9,29 @@ import (
 
 // 服务端配置
 type ServerConfig struct {
-	Port          int    // 服务端口
-	CustomPortKey string // 自定义端口的 Key
-	RandomPortKey string // 随机端口的 Key
+	Port int    // 服务端口
+	Key  string // 6-16 个字符，用于身份校验
 }
 
 var serverConfig ServerConfig
 
 // 从参数中解析配置
 func _parseServerConfig(args []string) ServerConfig {
-	if len(args) < 3 {
+	if len(args) < 2 {
 		log.Fatalln("More args in need")
 	}
+	// 0 key
+	key := strings.TrimSpace(args[0])
+
 	// 1 port
-	port, err := strconv.Atoi(strings.TrimSpace(args[0]))
+	port, err := strconv.Atoi(strings.TrimSpace(args[1]))
 	if err != nil || !checkPort(port) {
 		log.Fatalln("Fail to parse args.", args)
 	}
-	// 2 custom-port-key
-	customPortKey := strings.TrimSpace(args[1])
-	// 3 random-port-key
-	randomPortKey := strings.TrimSpace(args[2])
 
 	return ServerConfig{
-		Port:          port,
-		CustomPortKey: customPortKey,
-		RandomPortKey: randomPortKey,
+		Port: port,
+		Key:  key,
 	}
 }
 
@@ -48,10 +45,9 @@ func _loadServerConfig() ServerConfig {
 		return cfg.Section("server").Key(key)
 	}
 
-	args := make([]string, 3)
-	args[0] = server("port").String()
-	args[1] = server("custom-port-key").String()
-	args[2] = server("random-port-key").String()
+	args := make([]string, 2)
+	args[0] = server("key").String()
+	args[1] = server("port").String()
 
 	return _parseServerConfig(args)
 }
@@ -63,6 +59,5 @@ func InitServerConfig(args []string) ServerConfig {
 	} else {
 		serverConfig = _parseServerConfig(args)
 	}
-	log.Println("Init server config from config.ini finished", serverConfig)
 	return serverConfig
 }

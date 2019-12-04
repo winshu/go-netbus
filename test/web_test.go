@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+// 本地模拟多个 web 服务
+
 func handleWebRequest(w http.ResponseWriter, r *http.Request) {
 	log.Println("path", r.URL.Path)
 	_, _ = fmt.Fprintf(w, r.Host)
