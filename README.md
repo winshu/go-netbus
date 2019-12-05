@@ -22,11 +22,11 @@
 ```bash
 # 启动服务端
 
-$ netbus -server <port> <custom-port-key> <random-port-key>
+$ netbus -server <key> <port>
 
 # 注释
-# port                服务端端口，不要使用保留端口，必填
 # key                 6-16 个字符，用于身份校验
+# port                服务端端口，不要使用保留端口，必填
 
 ```
 
@@ -36,7 +36,7 @@ $ netbus -server <port> <custom-port-key> <random-port-key>
 $ netbus -client <key> <server:port> <local:port> [access-port] [max-redial-times]
 
 # 注释
-# key                与服务端保持一致
+# key                6-16 个字符，用于身份校验，与服务端保持一致
 # server:port        服务端地址，格式如：45.32.78.129:6666
 # local:port         被代理服务地址，多个以逗号隔开，比如：127.0.0.1:8080,127.0.0.1:9200
 # access-port        访问端口，与 local:port 一一对应，多个以逗号隔开，比如：9090,10200， 可选，若未填访问端口保持与 local:port 一致
@@ -59,7 +59,7 @@ key = winshu
 ```ini
 # 客户端配置
 [client]
-# Key 与服务端保持一致
+# 6-16 个字符，用于身份校验，与服务端保持一致
 key = winshu
 # 服务端地址，格式 ip:port
 server-host = 127.0.0.1:6666
