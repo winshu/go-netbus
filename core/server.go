@@ -35,10 +35,13 @@ func _accept(listener net.Listener) net.Conn {
 // 所有访问监听器
 // key:   accessPort
 // value: net.Listener
-var listeners sync.Map
+var (
+	listeners  sync.Map
+	listenerMu sync.Mutex
+)
 
 // 创建访问端口
-func _auth(req Protocol, cfg config.ServerConfig) (port int, ok bool) {
+func _checkAuth(req Protocol, cfg config.ServerConfig) (port int, ok bool) {
 	if len(req.Key) < protocolKeyMinLength || len(req.Key) > protocolKeyMaxLength {
 		return
 	}
@@ -48,34 +51,39 @@ func _auth(req Protocol, cfg config.ServerConfig) (port int, ok bool) {
 	return
 }
 
-func _fetchListener(accessPort int, cfg config.ServerConfig) net.Listener {
+func _fetchListener(accessPort int) net.Listener {
 	// 获取监听
 	listener, exists := listeners.Load(accessPort)
 	if exists {
-		log.Printf("Port [%d] is already listening\n", accessPort)
 		return listener.(net.Listener)
 	}
 
 	// 若不存在，则创建监听
-	listener = _listen(accessPort)
-	if listener == nil {
-		return nil
+	listenerMu.Lock()
+	defer listenerMu.Unlock()
+	// 双重检查
+	listener, exists = listeners.Load(accessPort)
+	if !exists {
+		listener = _listen(accessPort)
+		if listener != nil {
+			listeners.Store(accessPort, listener)
+		}
 	}
-	listeners.Store(accessPort, listener)
 	return listener.(net.Listener)
 }
 
 // 处理连接
-func _handleServerConn(bridgeConn net.Conn, cfg config.ServerConfig) {
+func _handleBridgeConn(bridgeConn net.Conn, cfg config.ServerConfig) {
 	// 接收协议消息
 	req, ok := receiveProtocol(bridgeConn)
 	if !ok {
+		log.Println("Fail to receive protocol")
 		sendProtocol(bridgeConn, req.NewResult(protocolResultFailToReceive))
 		closeConn(bridgeConn)
 		return
 	}
 	// 检查权限
-	accessPort, ok := _auth(req, cfg)
+	accessPort, ok := _checkAuth(req, cfg)
 	if !ok {
 		log.Println("Unauthorized access", req.String())
 		sendProtocol(bridgeConn, req.NewResult(protocolResultFailToAuth))
@@ -84,9 +92,9 @@ func _handleServerConn(bridgeConn net.Conn, cfg config.ServerConfig) {
 	}
 
 	// 建立连接
-	serverListener := _fetchListener(accessPort, cfg)
+	serverListener := _fetchListener(accessPort)
 	if serverListener == nil {
-		log.Println("Fail to fail server listener", req.String())
+		log.Println("Fail to fetch server listener", req.String())
 		sendProtocol(bridgeConn, req.NewResult(protocolResultFailToListen))
 		closeConn(bridgeConn)
 		return
@@ -98,7 +106,7 @@ func _handleServerConn(bridgeConn net.Conn, cfg config.ServerConfig) {
 		closeConn(serverConn)
 		return
 	}
-	log.Println("Accept a new server ->", req.String())
+	log.Println("Accept a new server ->", serverConn.RemoteAddr(), serverConn.LocalAddr(), req.String())
 	// 通知客户端，开始通讯
 	if sendProtocol(bridgeConn, Protocol{Port: accessPort, Key: req.Key}) {
 		forward(bridgeConn, serverConn)
@@ -120,7 +128,7 @@ func Server(cfg config.ServerConfig) {
 		bridgeConn := _accept(bridgeListener)
 		if bridgeConn != nil {
 			log.Println("Accept a new client ->", bridgeConn.RemoteAddr(), bridgeConn.LocalAddr())
-			go _handleServerConn(bridgeConn, cfg)
+			go _handleBridgeConn(bridgeConn, cfg)
 		}
 	}
 }

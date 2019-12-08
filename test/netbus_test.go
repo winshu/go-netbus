@@ -38,9 +38,7 @@ func TestClient(t *testing.T) {
 	core.Client(cfg)
 }
 
-func TestHeader(t *testing.T) {
-	arr := []string{"aa", "bb", "cc"}
-	for i := range arr {
-		fmt.Println(i)
-	}
+func TestListen(t *testing.T) {
+	fmt.Println(len("13306"))
+	fmt.Println(len([]byte("13306")))
 }

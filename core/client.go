@@ -4,6 +4,7 @@ import (
 	"../config"
 	"log"
 	"net"
+	"runtime"
 	"time"
 )
 
@@ -13,7 +14,7 @@ func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*�
 	for {
 		conn, err := net.Dial("tcp", targetAddr.String())
 		if err == nil {
-			log.Printf("Dial to [%s] success.\n", targetAddr)
+			//log.Printf("Dial to [%s] success.\n", targetAddr)
 			return conn
 		}
 
@@ -47,27 +48,57 @@ func _handleClientConn(cfg config.ClientConfig, index int) {
 	local := cfg.LocalAddr[index]
 	accessPort := cfg.AccessPort[index]
 
-	var conn, serverConn net.Conn
-	for {
-		// 代理服务拨号，失败则关闭客户端
-		if serverConn = _dial(server, cfg.MaxRedialTimes); serverConn == nil {
-			continue
+	connChan := make(chan net.Conn)
+	flagChan := make(chan bool)
+
+	// 拨号
+	go func(connCh chan net.Conn, flagCh chan bool) {
+		for {
+			select {
+			case <-flagCh:
+				go func(ch chan net.Conn) {
+					conn := _dial(server, cfg.MaxRedialTimes)
+					if conn == nil {
+						runtime.Goexit()
+					}
+					log.Printf("Proxy service [%s] -> [%s:%d]\n", local.String(), server.IP, accessPort)
+					resp, ok := _requestConn(conn, cfg.Key, accessPort)
+					if !ok || resp.Result != protocolResultSuccess {
+						log.Println("Fail to request conn.", resp.String())
+						closeConn(conn)
+						return
+					}
+					ch <- conn
+				}(connCh)
+			default:
+				// default
+			}
 		}
-		// 发送连接请求
-		resp, ok := _requestConn(serverConn, cfg.Key, accessPort)
-		if !ok || resp.Result != protocolResultSuccess {
-			log.Println("Fail to request conn.", resp.String())
-			closeConn(serverConn)
-			break
+	}(connChan, flagChan)
+
+	// 连接
+	go func(connCh chan net.Conn, flagCh chan bool) {
+		for {
+			select {
+			case cn := <-connCh:
+				go func(conn net.Conn) {
+					localConn := _dial(local, cfg.MaxRedialTimes)
+					if localConn == nil {
+						closeConn(conn)
+						flagCh <- true // 通知创建连接
+						return
+					}
+					flagCh <- true // 通知创建连接
+					forward(localConn, conn)
+				}(cn)
+			default:
+				// default
+			}
 		}
-		log.Printf("Proxy address [%s] --> [%s:%d]\n", local, server.IP, resp.Port)
-		// 如果内网服务不通，尝试重连后放弃
-		if conn = _dial(local, cfg.MaxRedialTimes); conn == nil {
-			closeConn(serverConn)
-			continue
-		}
-		forward(conn, serverConn)
-	}
+	}(connChan, flagChan)
+
+	// 初始化连接
+	flagChan <- true
 }
 
 // 入口
