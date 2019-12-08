@@ -11,7 +11,7 @@ import (
 
 const (
 	// 协议长度=字段数量
-	protocolLength = 3
+	protocolLength = 4
 
 	// 协议-结果
 	protocolResultSuccess       = 0 // 成功，默认值
@@ -28,26 +28,29 @@ const (
 )
 
 // 协议格式
-// 结果|消息类型|访问端口|Key
-// 0|0|7001|customabcd8000
+// 结果|消息类型|原端口|访问端口|Key
+// 0|0|3306|13306|winshu
 
 // 协议
 type Protocol struct {
-	Result int // 结果：0 失败，1 成功
-	Port   int // 端口
-	Key    string
+	Result     int    // 结果：0 失败，1 成功
+	AccessPort int    // 访问端口
+	Port       int    // 原端口
+	Key        string // 身份验证
 }
 
 // 转字符串
 func (p *Protocol) String() string {
-	return fmt.Sprintf("%d|%d|%s", p.Result, p.Port, p.Key)
+	return fmt.Sprintf("%d|%d|%d|%s", p.Result, p.Port, p.AccessPort, p.Key)
 }
 
+// 返回一个新结果
 func (p *Protocol) NewResult(newResult int) Protocol {
 	return Protocol{
-		Result: newResult,
-		Port:   p.Port,
-		Key:    p.Key,
+		Result:     newResult,
+		Port:       p.Port,
+		AccessPort: p.AccessPort,
+		Key:        p.Key,
 	}
 }
 
@@ -56,17 +59,20 @@ func _parseProtocol(body string) (Protocol, bool) {
 	// 拆解字符
 	arr := strings.Split(body, "|")
 	if len(arr) != protocolLength {
+		log.Println("Fail to parse protocol length")
 		return Protocol{Result: protocolResultFailToParse}, false
 	}
-	// 前两个字段
-	params, err := util.AtoInt(arr[0:2])
+	// 前三个字段
+	params, err := util.AtoInt(arr[0:3])
 	if err != nil {
+		log.Println("Fail to parse protocol type")
 		return Protocol{Result: protocolResultFailToParse}, false
 	}
 	return Protocol{
-		Result: params[0],
-		Port:   params[1],
-		Key:    arr[2],
+		Result:     params[0],
+		Port:       params[1],
+		AccessPort: params[2],
+		Key:        arr[3],
 	}, true
 }
 

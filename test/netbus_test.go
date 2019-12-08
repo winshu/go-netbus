@@ -40,5 +40,5 @@ func TestClient(t *testing.T) {
 
 func TestListen(t *testing.T) {
 	fmt.Println(len("13306"))
-	fmt.Println(len([]byte("13306")))
+	fmt.Println(len([]byte("0|65535|65535|1234567890123456")))
 }

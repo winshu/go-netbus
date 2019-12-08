@@ -31,10 +31,11 @@ func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*�
 }
 
 // 请求连接
-func _requestConn(serverConn net.Conn, key string, accessPort int) (Protocol, bool) {
+func _requestConn(serverConn net.Conn, key string, port int, accessPort int) (Protocol, bool) {
 	reqProtocol := Protocol{
-		Port: accessPort,
-		Key:  key,
+		AccessPort: accessPort,
+		Port:       port,
+		Key:        key,
 	}
 	if !sendProtocol(serverConn, reqProtocol) {
 		return Protocol{Result: protocolResultFailToSend}, false
@@ -62,7 +63,7 @@ func _handleClientConn(cfg config.ClientConfig, index int) {
 						runtime.Goexit()
 					}
 					log.Printf("Proxy service [%s] -> [%s:%d]\n", local.String(), server.IP, accessPort)
-					resp, ok := _requestConn(conn, cfg.Key, accessPort)
+					resp, ok := _requestConn(conn, cfg.Key, local.Port, accessPort)
 					if !ok || resp.Result != protocolResultSuccess {
 						log.Println("Fail to request conn.", resp.String())
 						closeConn(conn)

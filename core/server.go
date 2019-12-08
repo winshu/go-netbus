@@ -46,13 +46,13 @@ func _checkAuth(req Protocol, cfg config.ServerConfig) (port int, ok bool) {
 		return
 	}
 	if req.Key == cfg.Key {
-		return req.Port, true
+		return req.AccessPort, true
 	}
 	return
 }
 
+// 获取监听
 func _fetchListener(accessPort int) net.Listener {
-	// 获取监听
 	listener, exists := listeners.Load(accessPort)
 	if exists {
 		return listener.(net.Listener)
@@ -77,7 +77,7 @@ func _handleBridgeConn(bridgeConn net.Conn, cfg config.ServerConfig) {
 	// 接收协议消息
 	req, ok := receiveProtocol(bridgeConn)
 	if !ok {
-		log.Println("Fail to receive protocol")
+		log.Println("Fail to receive protocol", req.String())
 		sendProtocol(bridgeConn, req.NewResult(protocolResultFailToReceive))
 		closeConn(bridgeConn)
 		return
@@ -106,9 +106,9 @@ func _handleBridgeConn(bridgeConn net.Conn, cfg config.ServerConfig) {
 		closeConn(serverConn)
 		return
 	}
-	log.Println("Accept a new server ->", serverConn.RemoteAddr(), serverConn.LocalAddr(), req.String())
+	log.Println("Ready tunnel ->", req.String())
 	// 通知客户端，开始通讯
-	if sendProtocol(bridgeConn, Protocol{Port: accessPort, Key: req.Key}) {
+	if sendProtocol(bridgeConn, Protocol{AccessPort: accessPort, Port: req.Port, Key: req.Key}) {
 		forward(bridgeConn, serverConn)
 	}
 }
@@ -127,7 +127,7 @@ func Server(cfg config.ServerConfig) {
 		// 受理来自客户端的请求
 		bridgeConn := _accept(bridgeListener)
 		if bridgeConn != nil {
-			log.Println("Accept a new client ->", bridgeConn.RemoteAddr(), bridgeConn.LocalAddr())
+			log.Println("New bridge ->", bridgeConn.RemoteAddr())
 			go _handleBridgeConn(bridgeConn, cfg)
 		}
 	}
