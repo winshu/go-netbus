@@ -12,8 +12,8 @@ import (
 
 func printWelcome(args []string) {
 	fmt.Println("+----------------------------------------------------------------+")
-	fmt.Println("| Welcome to use NetBus version 1.0.2                            |")
-	fmt.Println("| Code by winshu at 2019/12/05                                   |")
+	fmt.Println("| Welcome to use NetBus version 1.0.3                            |")
+	fmt.Println("| Code by winshu at 2019/12/08                                   |")
 	fmt.Println("| If you have some problem when you use the tool,                |")
 	fmt.Println("| Please submit issue at : https://gitee.com/winshu/go-netbus    |")
 	fmt.Println("+----------------------------------------------------------------+")
