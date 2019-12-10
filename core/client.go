@@ -31,7 +31,7 @@ func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*�
 }
 
 // 请求连接
-func _requestConn(serverConn net.Conn, key string, port int, accessPort int) (Protocol, bool) {
+func _requestConn(serverConn net.Conn, key string, port uint32, accessPort uint32) (Protocol, bool) {
 	reqProtocol := Protocol{
 		AccessPort: accessPort,
 		Port:       port,

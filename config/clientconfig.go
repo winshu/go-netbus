@@ -1,7 +1,6 @@
 package config
 
 import (
-	"../util"
 	"github.com/go-ini/ini"
 	"log"
 	"strconv"
@@ -18,7 +17,7 @@ type ClientConfig struct {
 	Key            string       // 参考服务端配置 custom-port-key random-port-key
 	ServerAddr     NetAddress   // 服务端地址
 	LocalAddr      []NetAddress // 内网服务地址
-	AccessPort     []int        // 代理访问端口(不能为空)
+	AccessPort     []uint32     // 代理访问端口(不能为空)
 	MaxRedialTimes int          // 最大重连次数
 }
 
@@ -49,7 +48,7 @@ func _parseClientConfig(args []string) ClientConfig {
 	var err error
 
 	if len(args) >= 4 {
-		if config.AccessPort, err = util.AtoInt2(args[3]); err != nil {
+		if config.AccessPort, err = parsePorts(args[3]); err != nil {
 			log.Fatalln("Fail to parse AccessPort")
 		}
 	}

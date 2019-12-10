@@ -10,7 +10,7 @@ import (
 )
 
 // 监听端口
-func _listen(port int) net.Listener {
+func _listen(port uint32) net.Listener {
 	address := fmt.Sprintf("0.0.0.0:%d", port)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
@@ -41,7 +41,7 @@ var (
 )
 
 // 创建访问端口
-func _checkAuth(req Protocol, cfg config.ServerConfig) (port int, ok bool) {
+func _checkAuth(req Protocol, cfg config.ServerConfig) (port uint32, ok bool) {
 	if len(req.Key) < protocolKeyMinLength || len(req.Key) > protocolKeyMaxLength {
 		return
 	}
@@ -52,7 +52,7 @@ func _checkAuth(req Protocol, cfg config.ServerConfig) (port int, ok bool) {
 }
 
 // 获取监听
-func _fetchListener(accessPort int) net.Listener {
+func _fetchListener(accessPort uint32) net.Listener {
 	listener, exists := listeners.Load(accessPort)
 	if exists {
 		return listener.(net.Listener)

@@ -3,13 +3,12 @@ package config
 import (
 	"github.com/go-ini/ini"
 	"log"
-	"strconv"
 	"strings"
 )
 
 // 服务端配置
 type ServerConfig struct {
-	Port int    // 服务端口
+	Port uint32 // 服务端口
 	Key  string // 6-16 个字符，用于身份校验
 }
 
@@ -24,7 +23,7 @@ func _parseServerConfig(args []string) ServerConfig {
 	key := strings.TrimSpace(args[0])
 
 	// 1 port
-	port, err := strconv.Atoi(strings.TrimSpace(args[1]))
+	port, err := parsePort(args[1])
 	if err != nil || !checkPort(port) {
 		log.Fatalln("Fail to parse args.", args)
 	}
