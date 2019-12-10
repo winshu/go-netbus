@@ -3,6 +3,7 @@ package test
 import (
 	"../config"
 	"../core"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"testing"
@@ -32,13 +33,15 @@ func TestClient(t *testing.T) {
 		LocalAddr: []config.NetAddress{
 			{"127.0.0.1", 3306},
 		},
-		AccessPort:     []int{13306},
+		AccessPort:     []uint32{13306},
 		MaxRedialTimes: 10,
 	}
 	core.Client(cfg)
 }
 
-func TestListen(t *testing.T) {
-	fmt.Println(len("13306"))
-	fmt.Println(len([]byte("0|65535|65535|1234567890123456")))
+func TestProtocol(t *testing.T) {
+	buffer := make([]byte, 8)
+
+	binary.BigEndian.PutUint32(buffer[1:8], 22)
+	fmt.Println(buffer)
 }

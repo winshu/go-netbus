@@ -10,7 +10,7 @@ import (
 )
 
 // 监听端口
-func _listen(port int) net.Listener {
+func _listen(port uint32) net.Listener {
 	address := fmt.Sprintf("0.0.0.0:%d", port)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
@@ -41,7 +41,7 @@ var (
 )
 
 // 创建访问端口
-func _checkAuth(req Protocol, cfg config.ServerConfig) (port int, ok bool) {
+func _checkAuth(req Protocol, cfg config.ServerConfig) (port uint32, ok bool) {
 	if len(req.Key) < protocolKeyMinLength || len(req.Key) > protocolKeyMaxLength {
 		return
 	}
@@ -52,7 +52,7 @@ func _checkAuth(req Protocol, cfg config.ServerConfig) (port int, ok bool) {
 }
 
 // 获取监听
-func _fetchListener(accessPort int) net.Listener {
+func _fetchListener(accessPort uint32) net.Listener {
 	listener, exists := listeners.Load(accessPort)
 	if exists {
 		return listener.(net.Listener)
@@ -75,8 +75,8 @@ func _fetchListener(accessPort int) net.Listener {
 // 处理连接
 func _handleBridgeConn(bridgeConn net.Conn, cfg config.ServerConfig) {
 	// 接收协议消息
-	req, ok := receiveProtocol(bridgeConn)
-	if !ok {
+	req := receiveProtocol(bridgeConn)
+	if !req.Success() {
 		log.Println("Fail to receive protocol", req.String())
 		sendProtocol(bridgeConn, req.NewResult(protocolResultFailToReceive))
 		closeConn(bridgeConn)
@@ -102,14 +102,17 @@ func _handleBridgeConn(bridgeConn net.Conn, cfg config.ServerConfig) {
 
 	serverConn := _accept(serverListener)
 	if serverConn == nil {
-		closeConn(bridgeConn)
-		closeConn(serverConn)
+		closeConn(bridgeConn, serverConn)
 		return
 	}
 	log.Println("Ready tunnel ->", req.String())
+
 	// 通知客户端，开始通讯
-	if sendProtocol(bridgeConn, Protocol{AccessPort: accessPort, Port: req.Port, Key: req.Key}) {
+	if sendProtocol(bridgeConn, req.NewResult(protocolResultSuccess)) {
 		forward(bridgeConn, serverConn)
+	} else {
+		log.Println("Tunnel interrupted")
+		closeConn(bridgeConn, serverConn)
 	}
 }
 
@@ -127,7 +130,7 @@ func Server(cfg config.ServerConfig) {
 		// 受理来自客户端的请求
 		bridgeConn := _accept(bridgeListener)
 		if bridgeConn != nil {
-			log.Println("New bridge ->", bridgeConn.RemoteAddr())
+			//log.Println("New bridge ->", bridgeConn.RemoteAddr())
 			go _handleBridgeConn(bridgeConn, cfg)
 		}
 	}
