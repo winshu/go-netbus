@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 )
 
 const (
@@ -14,8 +15,8 @@ const (
 	protocolByteMaxLength = 25
 
 	// 协议-结果
-	protocolResultSuccess       = 0 // 成功，默认值
-	protocolResultFail          = 1 // 失败
+	protocolResultFail          = 0 // 失败，默认值
+	protocolResultSuccess       = 1 // 成功
 	protocolResultFailToSend    = 2 // 发送失败
 	protocolResultFailToReceive = 3 // 接收失败
 	protocolResultFailToParse   = 4 // 解析失败
@@ -25,6 +26,9 @@ const (
 	// Key 长度
 	protocolKeyMinLength = 6  // Key 最小长度
 	protocolKeyMaxLength = 16 // Key 最大长度
+
+	// 协议发送超时时间
+	protocolSendTimeout = 3
 )
 
 // 协议格式
@@ -68,22 +72,26 @@ func (p *Protocol) Len() byte {
 	return byte(len(p.Bytes()))
 }
 
+// 是否成功
+func (p *Protocol) Success() bool {
+	return p.Result == protocolResultSuccess
+}
+
 // 解析协议
-func _parseProtocol(body []byte) (Protocol, bool) {
+func _parseProtocol(body []byte) Protocol {
 	// 长度异常
 	if len(body) < protocolByteMinLength || len(body) > protocolByteMaxLength {
 		log.Println("Fail to parse protocol length")
-		return Protocol{Result: protocolResultFailToParse}, false
+		return Protocol{Result: protocolResultFailToParse}
 	}
 
-	protocol := Protocol{
+	return Protocol{
 		Result:     body[0],
 		Port:       binary.BigEndian.Uint32(body[1:5]),
 		AccessPort: binary.BigEndian.Uint32(body[5:9]),
 		Key:        string(body[9:]),
 	}
-	log.Println("Parse Protocol", protocol.String())
-	return protocol, true
+	//log.Println("Parse Protocol", protocol.String())
 }
 
 // 发送协议
@@ -94,8 +102,18 @@ func sendProtocol(conn net.Conn, req Protocol) bool {
 	buffer.WriteByte(req.Len())
 	buffer.Write(req.Bytes())
 
+	// 设置写超时时间，避免连接断开的问题
+	if err := conn.SetWriteDeadline(time.Now().Add(protocolSendTimeout * time.Second)); err != nil {
+		log.Println("Fail to set write deadline.", err.Error())
+		return false
+	}
 	if _, err := conn.Write(buffer.Bytes()); err != nil {
 		log.Printf("Send protocol failed. [%s] %s\n", req.String(), err.Error())
+		return false
+	}
+	// 清空写超时设置
+	if err := conn.SetWriteDeadline(time.Time{}); err != nil {
+		log.Println("Fail to clear write deadline.", err.Error())
 		return false
 	}
 	//log.Println("Send protocol", req.String())
@@ -104,19 +122,19 @@ func sendProtocol(conn net.Conn, req Protocol) bool {
 
 // 接收协议
 // 第一个字节为协议长度
-func receiveProtocol(conn net.Conn) (protocol Protocol, ok bool) {
+func receiveProtocol(conn net.Conn) Protocol {
 	var err error
 	var length byte
 
 	if err = binary.Read(conn, binary.BigEndian, &length); err != nil {
 		log.Println("Parse protocol length failed.", err.Error())
-		return Protocol{Result: protocolResultFailToReceive}, false
+		return Protocol{Result: protocolResultFailToReceive}
 	}
 	// 读取协议内容
 	body := make([]byte, length)
 	if err = binary.Read(conn, binary.BigEndian, &body); err != nil {
 		log.Println("Parse protocol body failed.", err.Error())
-		return Protocol{Result: protocolResultFailToReceive}, false
+		return Protocol{Result: protocolResultFailToReceive}
 	}
 	return _parseProtocol(body)
 }

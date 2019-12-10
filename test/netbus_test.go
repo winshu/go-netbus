@@ -39,13 +39,6 @@ func TestClient(t *testing.T) {
 	core.Client(cfg)
 }
 
-type pro struct {
-	r byte
-	p uint32
-	a uint32
-	k string
-}
-
 func TestProtocol(t *testing.T) {
 	buffer := make([]byte, 8)
 

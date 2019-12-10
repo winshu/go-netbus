@@ -35,8 +35,10 @@ func forward(conn1, conn2 net.Conn) {
 }
 
 // 关闭连接
-func closeConn(conn net.Conn) {
-	if conn != nil {
-		_ = conn.Close()
+func closeConn(connections ...net.Conn) {
+	for _, conn := range connections {
+		if conn != nil {
+			_ = conn.Close()
+		}
 	}
 }

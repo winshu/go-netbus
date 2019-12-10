@@ -21,7 +21,7 @@ func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*�
 		redialTimes++
 		if maxRedialTimes < 0 || redialTimes < maxRedialTimes {
 			// 重连模式，每5秒一次
-			log.Printf("Dial to [%s] failed, retry(%d) after %d seconeds.", targetAddr.String(), redialTimes, retryIntervalTime)
+			log.Printf("Dial to [%s] failed, redial(%d) after %d seconeds.", targetAddr.String(), redialTimes, retryIntervalTime)
 			time.Sleep(retryIntervalTime * time.Second)
 		} else {
 			log.Printf("Dial to [%s] failed. %s\n", targetAddr.String(), err.Error())
@@ -31,14 +31,15 @@ func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*�
 }
 
 // 请求连接
-func _requestConn(serverConn net.Conn, key string, port uint32, accessPort uint32) (Protocol, bool) {
+func _requestConn(serverConn net.Conn, key string, port uint32, accessPort uint32) Protocol {
 	reqProtocol := Protocol{
+		Result:     protocolResultSuccess,
 		AccessPort: accessPort,
 		Port:       port,
 		Key:        key,
 	}
 	if !sendProtocol(serverConn, reqProtocol) {
-		return Protocol{Result: protocolResultFailToSend}, false
+		return reqProtocol.NewResult(protocolResultFailToSend)
 	}
 	return receiveProtocol(serverConn)
 }
@@ -63,13 +64,15 @@ func _handleClientConn(cfg config.ClientConfig, index int) {
 						runtime.Goexit()
 					}
 					log.Printf("Proxy service [%s] -> [%s:%d]\n", local.String(), server.IP, accessPort)
-					resp, ok := _requestConn(conn, cfg.Key, local.Port, accessPort)
-					if !ok || resp.Result != protocolResultSuccess {
-						log.Println("Fail to request conn.", resp.String())
-						closeConn(conn)
+					resp := _requestConn(conn, cfg.Key, local.Port, accessPort)
+					if resp.Result == protocolResultSuccess {
+						ch <- conn
 						return
 					}
-					ch <- conn
+					// 连接中断，重新连接
+					log.Printf("bridge connection interrupted, try to redial. [%d] [%s]\n", resp.Result, local.String())
+					closeConn(conn)
+					flagCh <- true
 				}(connCh)
 			default:
 				// default
@@ -83,14 +86,16 @@ func _handleClientConn(cfg config.ClientConfig, index int) {
 			select {
 			case cn := <-connCh:
 				go func(conn net.Conn) {
-					localConn := _dial(local, cfg.MaxRedialTimes)
-					if localConn == nil {
+					// 本地连接，不需要重新拨号
+					if localConn := _dial(local, 0); localConn != nil {
+						// 通知创建新桥
+						flagCh <- true
+						forward(localConn, conn)
+					} else {
+						// 放弃连接，重新建桥
 						closeConn(conn)
-						flagCh <- true // 通知创建连接
-						return
+						flagCh <- true
 					}
-					flagCh <- true // 通知创建连接
-					forward(localConn, conn)
 				}(cn)
 			default:
 				// default
