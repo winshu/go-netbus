@@ -65,6 +65,7 @@ func _handleClientConn(cfg config.ClientConfig, index int) {
 					if conn == nil {
 						runtime.Goexit()
 					}
+					// 此处会阻塞，以等待访问者连接
 					log.Printf("Proxy service [%s] -> [%s:%d]\n", local.String(), server.IP, accessPort)
 					resp := _requestConn(conn, cfg.Key, local.Port, accessPort)
 
@@ -72,16 +73,21 @@ func _handleClientConn(cfg config.ClientConfig, index int) {
 					switch resp.Result {
 					case protocolResultSuccess:
 						ch <- conn
-						return
+					case protocolResultVersionMismatch:
+						// 版本不匹配，退出客户端
+						// 鉴权失败，退出客户端
+						log.Println("Version mismatch. exit")
+						os.Exit(0)
 					case protocolResultFailToAuth:
 						// 鉴权失败，退出客户端
 						log.Println("Fail to auth. exit")
 						os.Exit(0)
+					default:
+						// 连接中断，重新连接
+						log.Printf("bridge connection interrupted, try to redial. [%d] [%s]\n", resp.Result, local.String())
+						closeConn(conn)
+						flagCh <- true
 					}
-					// 连接中断，重新连接
-					log.Printf("bridge connection interrupted, try to redial. [%d] [%s]\n", resp.Result, local.String())
-					closeConn(conn)
-					flagCh <- true
 				}(connCh)
 			default:
 				// default
