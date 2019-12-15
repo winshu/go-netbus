@@ -40,14 +40,6 @@ var (
 	listenerMu sync.Mutex
 )
 
-// 检查权限，并返回访问端口
-func _checkAuth(req Protocol, cfg config.ServerConfig) (uint32, bool) {
-	if _, ok := config.CheckKey(cfg.Key, req.Key); ok {
-		return req.AccessPort, true
-	}
-	return req.AccessPort, false
-}
-
 // 获取监听
 func _fetchListener(accessPort uint32) net.Listener {
 	listener, exists := listeners.Load(accessPort)
@@ -79,9 +71,16 @@ func _handleBridgeConn(bridgeConn net.Conn, cfg config.ServerConfig) {
 		closeConn(bridgeConn)
 		return
 	}
+	// 检查版本号
+	if req.Version != protocolVersion {
+		log.Println("Version mismatch", req.String())
+		sendProtocol(bridgeConn, req.NewResult(protocolResultVersionMismatch))
+		closeConn(bridgeConn)
+		return
+	}
+
 	// 检查权限
-	accessPort, ok := _checkAuth(req, cfg)
-	if !ok {
+	if _, ok := config.CheckKey(cfg.Key, req.Key); !ok {
 		log.Println("Unauthorized access", req.String())
 		sendProtocol(bridgeConn, req.NewResult(protocolResultFailToAuth))
 		closeConn(bridgeConn)
@@ -89,7 +88,7 @@ func _handleBridgeConn(bridgeConn net.Conn, cfg config.ServerConfig) {
 	}
 
 	// 建立连接
-	serverListener := _fetchListener(accessPort)
+	serverListener := _fetchListener(req.AccessPort)
 	if serverListener == nil {
 		log.Println("Fail to fetch server listener", req.String())
 		sendProtocol(bridgeConn, req.NewResult(protocolResultFailToListen))
@@ -102,7 +101,7 @@ func _handleBridgeConn(bridgeConn net.Conn, cfg config.ServerConfig) {
 		closeConn(bridgeConn, serverConn)
 		return
 	}
-	log.Println("Ready tunnel ->", req.String())
+	log.Println("Tunnel connected ->", req.String())
 
 	// 通知客户端，开始通讯
 	if sendProtocol(bridgeConn, req.NewResult(protocolResultSuccess)) {

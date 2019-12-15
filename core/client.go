@@ -35,6 +35,7 @@ func _dial(targetAddr config.NetAddress /*目标地址*/, maxRedialTimes int /*�
 func _requestConn(serverConn net.Conn, key string, port uint32, accessPort uint32) Protocol {
 	reqProtocol := Protocol{
 		Result:     protocolResultSuccess,
+		Version:    protocolVersion,
 		AccessPort: accessPort,
 		Port:       port,
 		Key:        key,
