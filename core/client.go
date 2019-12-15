@@ -4,6 +4,7 @@ import (
 	"../config"
 	"log"
 	"net"
+	"os"
 	"runtime"
 	"time"
 )
@@ -53,7 +54,7 @@ func _handleClientConn(cfg config.ClientConfig, index int) {
 	connChan := make(chan net.Conn)
 	flagChan := make(chan bool)
 
-	// 拨号
+	// 远程拨号，建桥
 	go func(connCh chan net.Conn, flagCh chan bool) {
 		for {
 			select {
@@ -65,9 +66,16 @@ func _handleClientConn(cfg config.ClientConfig, index int) {
 					}
 					log.Printf("Proxy service [%s] -> [%s:%d]\n", local.String(), server.IP, accessPort)
 					resp := _requestConn(conn, cfg.Key, local.Port, accessPort)
-					if resp.Result == protocolResultSuccess {
+
+					// 处理连接结果
+					switch resp.Result {
+					case protocolResultSuccess:
 						ch <- conn
 						return
+					case protocolResultFailToAuth:
+						// 鉴权失败，退出客户端
+						log.Println("Fail to auth. exit")
+						os.Exit(0)
 					}
 					// 连接中断，重新连接
 					log.Printf("bridge connection interrupted, try to redial. [%d] [%s]\n", resp.Result, local.String())
@@ -80,7 +88,7 @@ func _handleClientConn(cfg config.ClientConfig, index int) {
 		}
 	}(connChan, flagChan)
 
-	// 连接
+	// 本地连接拨号，并建立双向通道
 	go func(connCh chan net.Conn, flagCh chan bool) {
 		for {
 			select {

@@ -40,15 +40,12 @@ var (
 	listenerMu sync.Mutex
 )
 
-// 创建访问端口
-func _checkAuth(req Protocol, cfg config.ServerConfig) (port uint32, ok bool) {
-	if len(req.Key) < protocolKeyMinLength || len(req.Key) > protocolKeyMaxLength {
-		return
-	}
-	if req.Key == cfg.Key {
+// 检查权限，并返回访问端口
+func _checkAuth(req Protocol, cfg config.ServerConfig) (uint32, bool) {
+	if _, ok := config.CheckKey(cfg.Key, req.Key); ok {
 		return req.AccessPort, true
 	}
-	return
+	return req.AccessPort, false
 }
 
 // 获取监听

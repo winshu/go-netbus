@@ -10,10 +10,6 @@ import (
 )
 
 const (
-	// 协议长度=字段数量
-	protocolByteMinLength = 15
-	protocolByteMaxLength = 25
-
 	// 协议-结果
 	protocolResultFail          = 0 // 失败，默认值
 	protocolResultSuccess       = 1 // 成功
@@ -22,10 +18,6 @@ const (
 	protocolResultFailToParse   = 4 // 解析失败
 	protocolResultFailToAuth    = 5 // 鉴权失败
 	protocolResultFailToListen  = 6 // 监听失败
-
-	// Key 长度
-	protocolKeyMinLength = 6  // Key 最小长度
-	protocolKeyMaxLength = 16 // Key 最大长度
 
 	// 协议发送超时时间
 	protocolSendTimeout = 3
@@ -79,12 +71,6 @@ func (p *Protocol) Success() bool {
 
 // 解析协议
 func _parseProtocol(body []byte) Protocol {
-	// 长度异常
-	if len(body) < protocolByteMinLength || len(body) > protocolByteMaxLength {
-		log.Println("Fail to parse protocol length")
-		return Protocol{Result: protocolResultFailToParse}
-	}
-
 	return Protocol{
 		Result:     body[0],
 		Port:       binary.BigEndian.Uint32(body[1:5]),
