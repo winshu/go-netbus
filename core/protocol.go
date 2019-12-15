@@ -11,25 +11,29 @@ import (
 
 const (
 	// 协议-结果
-	protocolResultFail          = 0 // 失败，默认值
-	protocolResultSuccess       = 1 // 成功
-	protocolResultFailToSend    = 2 // 发送失败
-	protocolResultFailToReceive = 3 // 接收失败
-	protocolResultFailToParse   = 4 // 解析失败
-	protocolResultFailToAuth    = 5 // 鉴权失败
-	protocolResultFailToListen  = 6 // 监听失败
+	protocolResultFail            = 0 // 失败，默认值
+	protocolResultSuccess         = 1 // 成功
+	protocolResultFailToSend      = 2 // 发送失败
+	protocolResultFailToReceive   = 3 // 接收失败
+	protocolResultFailToAuth      = 4 // 鉴权失败
+	protocolResultFailToListen    = 5 // 监听失败
+	protocolResultVersionMismatch = 6 // 版本不匹配
 
 	// 协议发送超时时间
 	protocolSendTimeout = 3
+
+	// 版本号(单调递增)
+	protocolVersion = 1
 )
 
 // 协议格式
-// 结果|原端口|访问端口|Key
-// 1|0|3306|13306|winshu
+// 结果|版本号|原端口|访问端口|Key
+// 1|0|1|3306|13306|winshu
 
 // 协议
 type Protocol struct {
 	Result     byte   // 结果：0 失败，1 成功
+	Version    uint32 // 版本号，单调递增
 	AccessPort uint32 // 访问端口
 	Port       uint32 // 原端口
 	Key        string // 身份验证
@@ -37,13 +41,14 @@ type Protocol struct {
 
 // 转字符串
 func (p *Protocol) String() string {
-	return fmt.Sprintf("%d|%d|%d|%s", p.Result, p.Port, p.AccessPort, p.Key)
+	return fmt.Sprintf("%d|%d|%d|%d|%s", p.Result, p.Version, p.Port, p.AccessPort, p.Key)
 }
 
 // 返回一个新结果
 func (p *Protocol) NewResult(newResult byte) Protocol {
 	return Protocol{
 		Result:     newResult,
+		Version:    p.Version,
 		Port:       p.Port,
 		AccessPort: p.AccessPort,
 		Key:        p.Key,
@@ -54,6 +59,7 @@ func (p *Protocol) Bytes() []byte {
 	buffer := bytes.NewBuffer([]byte{})
 
 	buffer.WriteByte(p.Result)
+	_ = binary.Write(buffer, binary.BigEndian, p.Version)
 	_ = binary.Write(buffer, binary.BigEndian, p.Port)
 	_ = binary.Write(buffer, binary.BigEndian, p.AccessPort)
 	buffer.WriteString(p.Key)
@@ -73,9 +79,10 @@ func (p *Protocol) Success() bool {
 func _parseProtocol(body []byte) Protocol {
 	return Protocol{
 		Result:     body[0],
-		Port:       binary.BigEndian.Uint32(body[1:5]),
-		AccessPort: binary.BigEndian.Uint32(body[5:9]),
-		Key:        string(body[9:]),
+		Version:    binary.BigEndian.Uint32(body[1:5]),
+		Port:       binary.BigEndian.Uint32(body[5:9]),
+		AccessPort: binary.BigEndian.Uint32(body[9:13]),
+		Key:        string(body[13:]),
 	}
 	//log.Println("Parse Protocol", protocol.String())
 }
