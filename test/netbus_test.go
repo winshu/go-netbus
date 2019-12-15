@@ -3,7 +3,6 @@ package test
 import (
 	"../config"
 	"../core"
-	"encoding/binary"
 	"fmt"
 	"log"
 	"testing"
@@ -18,8 +17,8 @@ func init() {
 // netbus
 func TestServer(t *testing.T) {
 	cfg := config.ServerConfig{
-		Port: 6666,
 		Key:  "winshu",
+		Port: 6666,
 	}
 	core.Server(cfg)
 }
@@ -40,8 +39,8 @@ func TestClient(t *testing.T) {
 }
 
 func TestProtocol(t *testing.T) {
-	buffer := make([]byte, 8)
-
-	binary.BigEndian.PutUint32(buffer[1:8], 22)
-	fmt.Println(buffer)
+	seed := "winshu"
+	key, _ := config.NewKey(seed, "2019-12-31")
+	fmt.Println(key)
+	fmt.Println(config.CheckKey(seed, key))
 }
