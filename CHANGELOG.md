@@ -38,6 +38,7 @@
 通讯协议
 
 - 通讯结果    1个字节(1: 成功，其他：失败)
+- 版本号      4个字节
 - 原端口      4个字节
 - 访问端口    4个字节
 - Key        建议长度 6-16 字符串
@@ -45,7 +46,7 @@
 协议最大长度不能超过 255
 
 举例
-1|3306|13306|winshu
+1|1|3306|13306|winshu
 
 ## 简易编译打包脚本
 
@@ -53,16 +54,27 @@
 # linux
 git pull
 go build -o netbus main.go
-tar -zvcf netbus_linux_amd64.tar.gz netbus config.ini
+mkdir netbus_linux_amd64
+mv netbus netbus_linux_amd64
+cp config.ini netbus_linux_amd64
+tar -zvcf netbus_linux_amd64.tar.gz netbus_linux_amd64
+rm -rf netbus_linux_amd64
 mv netbus_linux_amd64.tar.gz /mnt/d/
 
 ```
 
 ```bash
 # windows
+@echo off
 git pull
 go build -o netbus.exe main.go
-"C:/Program Files (x86)/WinRAR/WinRAR.exe" a netbus_windows_amd64.zip ./netbus.exe ./config.ini
+mkdir netbus_windows_amd64
+move /Y netbus.exe netbus_windows_amd64
+xcopy /Y config.ini netbus_windows_amd64
+xcopy /Y doc\*.bat netbus_windows_amd64
+del /Q netbus_windows_amd64.zip
+"C:/Program Files (x86)/WinRAR/WinRAR.exe" a netbus_windows_amd64.zip netbus_windows_amd64
+rmdir /S/Q netbus_windows_amd64
 
 ```
 
